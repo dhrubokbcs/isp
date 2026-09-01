@@ -55,13 +55,20 @@ Academic Year ➔ Program ➔ Class Level ➔ Batch ➔ Subject ➔ Teacher Assi
 ## 2. Technology Stack & Boundaries
 
 - **Framework**: Next.js App Router (TypeScript, React 19)
+- **Subdomain Routing Architecture**:
+  - **`console.*` (`console.ispctg.live` / `console.localhost:3000`)**:
+    - Strictly for **SUPERADMIN**, **ADMIN**, and **TEACHER**.
+    - Internal rewrites via Edge Middleware to `/console/*` routes.
+    - Staff authentication: Email / Password.
+  - **Root Domain (`ispctg.live` / `localhost:3000`)**:
+    - For **STUDENTS** and **GUARDIANS**.
+    - Student authentication: Google OAuth (strictly linked to pre-verified records).
+    - Guardian authentication: Email / Password.
 - **UI Library**: Material UI (MUI) via official `@mui/material-nextjs` App Router integration.
 - **Components**: MUI Core, MUI X DataGrid, MUI X Date Pickers, MUI Icons.
 - **Strictly Disallowed**: Tailwind CSS, shadcn/ui, Chakra UI, Ant Design, Bootstrap, DaisyUI.
 - **Database**: Supabase PostgreSQL + Prisma ORM.
 - **Authentication**: Supabase Auth
-  - Students: Google OAuth (strictly linked to pre-verified ISP student records)
-  - Staff / Teachers / Admins / Guardians: Email/Password (invitation/admin-created only)
 - **Validation**: Zod (strict server-side and client-side schemas)
 - **Forms**: React Hook Form
 - **Storage**: Supabase Storage (private buckets for documents, academic assets, receipts)
