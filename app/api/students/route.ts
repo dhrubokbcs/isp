@@ -5,6 +5,7 @@ import {
   updateStudentInSupabase,
   deleteStudentInSupabase,
 } from '@/lib/db/supabaseStudents';
+import { sendStudentAdmissionWelcomeEmail } from '@/lib/email/mailer';
 
 export async function GET(request: Request) {
   try {
@@ -36,6 +37,16 @@ export async function POST(request: Request) {
       ...body,
       admissionYear: parseInt(admissionYear, 10) || 2028,
     });
+
+    if (created?.email && created.email.includes('@')) {
+      sendStudentAdmissionWelcomeEmail({
+        to: created.email,
+        studentName: created.fullName,
+        studentId: created.studentId,
+        batchName: created.batchName,
+        admissionYear: created.admissionAcademicYear,
+      }).catch((e) => console.warn('[Welcome Email Notice]:', e.message));
+    }
 
     return NextResponse.json({ success: true, student: created }, { status: 201 });
   } catch (err: any) {

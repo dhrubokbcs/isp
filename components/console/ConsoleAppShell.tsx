@@ -38,6 +38,7 @@ import AssignmentRoundedIcon from '@mui/icons-material/AssignmentRounded';
 import PaymentsRoundedIcon from '@mui/icons-material/PaymentsRounded';
 import CampaignRoundedIcon from '@mui/icons-material/CampaignRounded';
 import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
+import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import ManageAccountsRoundedIcon from '@mui/icons-material/ManageAccountsRounded';
 import SecurityRoundedIcon from '@mui/icons-material/SecurityRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
@@ -224,6 +225,12 @@ const navSections: NavSection[] = [
     title: 'SYSTEM',
     items: [
       {
+        label: 'Settings',
+        href: '/admin/settings',
+        icon: <SettingsRoundedIcon fontSize="small" />,
+        roles: ['SUPERADMIN', 'ADMIN'],
+      },
+      {
         label: 'Audit Logs',
         href: '/admin/system/audit-logs',
         icon: <AdminPanelSettingsRoundedIcon fontSize="small" />,
@@ -244,8 +251,57 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
   const [userName, setUserName] = React.useState('ISP Administrator');
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
 
-  // Sync role from localStorage
+  // Live sync user name and role from database and localStorage
   React.useEffect(() => {
+    const fetchLiveAccount = async () => {
+      try {
+        let query = '';
+        if (typeof window !== 'undefined') {
+          const storedUser = localStorage.getItem('isp_console_user');
+          if (storedUser) {
+            try {
+              const parsed = JSON.parse(storedUser);
+              if (parsed.id) query = `?userId=${parsed.id}`;
+            } catch {
+              // ignore
+            }
+          }
+        }
+
+        const res = await fetch(`/api/account${query}`);
+        const data = await res.json();
+        if (res.ok && data.success && data.account) {
+          const acc = data.account;
+          if (acc.fullName) {
+            setUserName(acc.fullName);
+            if (typeof window !== 'undefined') {
+              const storedUser = localStorage.getItem('isp_console_user');
+              const parsed = storedUser ? JSON.parse(storedUser) : {};
+              localStorage.setItem(
+                'isp_console_user',
+                JSON.stringify({
+                  ...parsed,
+                  id: acc.id,
+                  name: acc.fullName,
+                  email: acc.email,
+                  role: acc.role,
+                })
+              );
+            }
+          }
+          if (acc.role) {
+            setUserRole(acc.role);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('isp_console_role', acc.role);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not sync live user account in header:', err);
+      }
+    };
+
+    // 1. Initial immediate load from localStorage
     if (typeof window !== 'undefined') {
       const storedRole = localStorage.getItem('isp_console_role') as 'SUPERADMIN' | 'ADMIN' | 'TEACHER';
       if (storedRole) setUserRole(storedRole);
@@ -260,6 +316,18 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
         }
       }
     }
+
+    // 2. Fetch live data from Supabase DB
+    fetchLiveAccount();
+
+    // 3. Listen for immediate profile updates from other pages
+    const handleProfileUpdate = () => {
+      fetchLiveAccount();
+    };
+    window.addEventListener('isp_user_profile_updated', handleProfileUpdate);
+    return () => {
+      window.removeEventListener('isp_user_profile_updated', handleProfileUpdate);
+    };
   }, []);
 
   const handleDrawerToggle = () => {
@@ -464,18 +532,6 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
               </IconButton>
             </Tooltip>
 
-            <Chip
-              label={userRole}
-              size="small"
-              sx={{
-                height: 26,
-                fontWeight: 600,
-                fontSize: '12px',
-                bgcolor: ispColors.primary[50],
-                color: ispColors.primary[700],
-              }}
-            />
-
             <IconButton size="small" onClick={(e) => setAnchorEl(e.currentTarget)}>
               <Avatar sx={{ width: 34, height: 34, bgcolor: ispColors.primary[600], fontSize: '14px', fontWeight: 600 }}>
                 {userName.charAt(0)}
@@ -490,22 +546,74 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
               anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
               slotProps={{
                 paper: {
-                  sx: { width: 200, mt: 1, p: 0.5, borderRadius: '10px' },
+                  sx: { width: 250, mt: 1, p: 0.5, borderRadius: '12px' },
                 },
               }}
             >
-              <MenuItem disabled sx={{ opacity: '1 !important' }}>
-                <Box>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{userName}</Typography>
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>{userRole} Account</Typography>
+              {/* First Row: Avatar at left, in right name, after name user role badge */}
+              <Box sx={{ px: 1.5, py: 1.2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Avatar sx={{ width: 40, height: 40, bgcolor: ispColors.primary[600], fontSize: '16px', fontWeight: 700 }}>
+                  {userName.charAt(0)}
+                </Avatar>
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#061B57', noWrap: true, lineHeight: 1.3 }}>
+                    {userName}
+                  </Typography>
+                  <Box sx={{ mt: 0.4 }}>
+                    <Chip
+                      label={userRole}
+                      size="small"
+                      sx={{
+                        height: 20,
+                        fontSize: '10px',
+                        fontWeight: 800,
+                        bgcolor: '#EEF4FF',
+                        color: '#1748D1',
+                        borderRadius: '4px',
+                        border: '1px solid #BFDBFE',
+                        letterSpacing: '0.5px',
+                      }}
+                    />
+                  </Box>
                 </Box>
+              </Box>
+
+              <Divider sx={{ my: 0.8 }} />
+
+              {/* Menu Item 1: Dashboard */}
+              <MenuItem
+                component={Link}
+                href={userRole === 'TEACHER' ? '/teacher/dashboard' : '/admin/dashboard'}
+                onClick={() => setAnchorEl(null)}
+                sx={{ fontWeight: 600, fontSize: '13.5px', py: 1, borderRadius: '8px' }}
+              >
+                <ListItemIcon sx={{ minWidth: 28, color: '#1748D1' }}>
+                  <DashboardRoundedIcon fontSize="small" />
+                </ListItemIcon>
+                Dashboard
               </MenuItem>
-              <Divider sx={{ my: 1 }} />
-              <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
+
+              {/* Menu Item 2: Account & Security */}
+              <MenuItem
+                component={Link}
+                href="/admin/account"
+                onClick={() => setAnchorEl(null)}
+                sx={{ fontWeight: 600, fontSize: '13.5px', py: 1, borderRadius: '8px' }}
+              >
+                <ListItemIcon sx={{ minWidth: 28, color: '#1748D1' }}>
+                  <ManageAccountsRoundedIcon fontSize="small" />
+                </ListItemIcon>
+                Account &amp; Security
+              </MenuItem>
+
+              <Divider sx={{ my: 0.8 }} />
+
+              {/* Menu Item 3: Logout */}
+              <MenuItem onClick={handleLogout} sx={{ color: 'error.main', fontWeight: 600, fontSize: '13.5px', py: 1, borderRadius: '8px' }}>
                 <ListItemIcon sx={{ color: 'error.main', minWidth: 28 }}>
                   <LogoutRoundedIcon fontSize="small" />
                 </ListItemIcon>
-                Sign Out
+                Logout
               </MenuItem>
             </Menu>
           </Box>
