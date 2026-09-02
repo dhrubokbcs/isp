@@ -197,7 +197,8 @@ export async function updateUserPasswordInSupabase(
     return { success: false, message: 'User not found' };
   }
 
-  const existingMeta = (typeof target.metadata === 'object' && target.metadata !== null) ? target.metadata : {};
+  const existingMeta = (typeof target.metadata === 'object' && target.metadata !== null) ? { ...target.metadata } : {};
+  delete existingMeta.initialPassword;
 
   const passwordHash = await hashPassword(newPassword);
 
