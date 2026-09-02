@@ -370,8 +370,10 @@ export default function StudentsDirectoryPage() {
         anchor="right"
         open={Boolean(selectedStudent)}
         onClose={() => setSelectedStudent(null)}
-        slotProps={{ backdrop: { sx: { backdropFilter: 'blur(2px)' } } }}
-        PaperProps={{ sx: { width: { xs: '100%', sm: 540 }, p: 3.5 } }}
+        slotProps={{
+          backdrop: { sx: { backdropFilter: 'blur(2px)' } },
+          paper: { sx: { width: { xs: '100%', sm: 540 }, p: 3.5 } },
+        }}
       >
         {selectedStudent && (
           <Box>

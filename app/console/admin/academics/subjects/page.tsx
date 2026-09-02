@@ -792,13 +792,15 @@ export default function SubjectsPage() {
         anchor="right"
         open={Boolean(syllabusSubject)}
         onClose={() => setSyllabusSubject(null)}
-        slotProps={{ backdrop: { sx: { backdropFilter: 'blur(2px)' } } }}
-        PaperProps={{
-          sx: {
-            width: { xs: '100%', sm: 640 },
-            display: 'flex',
-            flexDirection: 'column',
-            bgcolor: '#F8FAFC',
+        slotProps={{
+          backdrop: { sx: { backdropFilter: 'blur(2px)' } },
+          paper: {
+            sx: {
+              width: { xs: '100%', sm: 640 },
+              display: 'flex',
+              flexDirection: 'column',
+              bgcolor: '#F8FAFC',
+            },
           },
         }}
       >

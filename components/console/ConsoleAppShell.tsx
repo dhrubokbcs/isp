@@ -556,7 +556,7 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
                   {userName.charAt(0)}
                 </Avatar>
                 <Box sx={{ minWidth: 0, flex: 1 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#061B57', noWrap: true, lineHeight: 1.3 }}>
+                  <Typography variant="body2" noWrap sx={{ fontWeight: 700, color: '#061B57', lineHeight: 1.3 }}>
                     {userName}
                   </Typography>
                   <Box sx={{ mt: 0.4 }}>

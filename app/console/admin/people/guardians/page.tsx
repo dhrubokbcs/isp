@@ -497,9 +497,9 @@ export default function GuardiansDirectoryPage() {
         anchor="right"
         open={Boolean(selectedGuardian)}
         onClose={() => setSelectedGuardian(null)}
-        slotProps={{ backdrop: { sx: { backdropFilter: 'blur(2px)' } } }}
-        PaperProps={{
-          sx: { width: { xs: '100%', sm: 540 }, p: 3.5, bgcolor: '#FFFFFF' },
+        slotProps={{
+          backdrop: { sx: { backdropFilter: 'blur(2px)' } },
+          paper: { sx: { width: { xs: '100%', sm: 540 }, p: 3.5, bgcolor: '#FFFFFF' } },
         }}
       >
         {selectedGuardian && (
