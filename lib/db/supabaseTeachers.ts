@@ -1,4 +1,5 @@
 import { Teacher, generateRandomPassword } from './teachers';
+import { hashPassword } from '@/lib/security/password';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lzckoyeouimyrjzcefkp.supabase.co';
 const SERVICE_KEY =
@@ -94,12 +95,13 @@ export async function createTeacherInSupabase(data: {
 }): Promise<Teacher> {
   const employeeId = await getNextEmployeeIdFromSupabase();
   const initialPassword = data.initialPassword || generateRandomPassword();
+  const passwordHash = await hashPassword(initialPassword);
   const now = new Date().toISOString();
 
   // 1. Insert into public.users table
   const userPayload = {
     email: data.email.trim().toLowerCase(),
-    password_hash: initialPassword,
+    password_hash: passwordHash,
     full_name: data.fullName.trim(),
     phone: data.mobile.trim(),
     role: 'TEACHER',
@@ -113,7 +115,6 @@ export async function createTeacherInSupabase(data: {
       educationalDetails: data.educationalDetails ? data.educationalDetails.trim() : '',
       experience: data.experience ? data.experience.trim() : '',
       whatsapp: data.whatsapp ? data.whatsapp.trim() : data.mobile.trim(),
-      initialPassword,
     },
     created_at: now,
     updated_at: now,

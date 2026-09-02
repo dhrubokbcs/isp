@@ -1,4 +1,5 @@
 import { generateRandomPassword } from './teachers';
+import { hashPassword } from '@/lib/security/password';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lzckoyeouimyrjzcefkp.supabase.co';
 const SERVICE_KEY =
@@ -72,17 +73,17 @@ export async function createAdminInSupabase(data: {
   password?: string;
 }): Promise<SystemUser> {
   const initialPassword = data.password || generateRandomPassword(10);
+  const passwordHash = await hashPassword(initialPassword);
   const now = new Date().toISOString();
 
   const payload = {
     email: data.email.trim().toLowerCase(),
-    password_hash: initialPassword,
+    password_hash: passwordHash,
     full_name: data.fullName.trim(),
     phone: data.phone ? data.phone.trim() : null,
     role: 'ADMIN',
     status: 'ACTIVE',
     metadata: {
-      initialPassword,
       createdVia: 'CONSOLE_USERS_MODULE',
     },
     created_at: now,
@@ -198,14 +199,15 @@ export async function updateUserPasswordInSupabase(
 
   const existingMeta = (typeof target.metadata === 'object' && target.metadata !== null) ? target.metadata : {};
 
+  const passwordHash = await hashPassword(newPassword);
+
   const res = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${id}`, {
     method: 'PATCH',
     headers: getHeaders(),
     body: JSON.stringify({
-      password_hash: newPassword,
+      password_hash: passwordHash,
       metadata: {
         ...existingMeta,
-        initialPassword: newPassword,
         lastPasswordReset: new Date().toISOString(),
       },
       updated_at: new Date().toISOString(),

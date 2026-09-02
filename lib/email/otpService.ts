@@ -1,4 +1,5 @@
 import { sendOtpEmail } from './mailer';
+import { hashPassword } from '@/lib/security/password';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -197,14 +198,17 @@ export async function verifyOtpAndExecute(params: {
       if (!rows || rows.length === 0) return { success: false, error: 'User not found.' };
 
       const user = rows[0];
-      const updatedMeta = { ...(user.metadata || {}), initialPassword: params.newPassword };
+      const passwordHash = await hashPassword(params.newPassword);
+      const updatedMeta = { ...(user.metadata || {}) };
+      delete updatedMeta.initialPassword;
       delete updatedMeta.pending_otp;
+      updatedMeta.lastPasswordReset = new Date().toISOString();
 
       const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${user.id}`, {
         method: 'PATCH',
         headers: getHeaders(),
         body: JSON.stringify({
-          password_hash: params.newPassword,
+          password_hash: passwordHash,
           metadata: updatedMeta,
           updated_at: new Date().toISOString(),
         }),

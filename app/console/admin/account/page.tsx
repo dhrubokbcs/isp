@@ -420,9 +420,13 @@ export default function MyAccountSettingsPage() {
     }
   };
 
-  // 2. Direct Password Change (Requires current password verification or use OTP)
-  const handleSavePassword = (e: React.FormEvent) => {
+  // 2. Direct Password Change (Requires current password verification)
+  const handleSavePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentPassword) {
+      toastError('Please enter your current password.');
+      return;
+    }
     if (!newPassword || newPassword.length < 6) {
       toastError('New password must be at least 6 characters long.');
       return;
@@ -431,11 +435,33 @@ export default function MyAccountSettingsPage() {
       toastError('New password and confirmation do not match.');
       return;
     }
-    // Direct password update
-    success('Password updated successfully!');
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+
+    setSaving(true);
+    try {
+      const res = await fetch('/api/account/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: account?.id,
+          currentPassword,
+          newPassword,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update password.');
+      }
+
+      success('Password updated and securely hashed successfully!');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      toastError(err.message || 'Error updating password.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   // 4. Toggle Google Link

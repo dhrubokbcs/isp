@@ -27,7 +27,6 @@ import EmailRoundedIcon from '@mui/icons-material/EmailRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import VpnKeyRoundedIcon from '@mui/icons-material/VpnKeyRounded';
 import { ispColors } from '@/theme/colors';
-import { authenticateUser } from '@/lib/db/users';
 
 export default function ConsoleLoginPage() {
   const router = useRouter();
@@ -122,11 +121,17 @@ export default function ConsoleLoginPage() {
     setError(null);
 
     try {
-      // 1. Authenticate against User Database / Supabase Auth
-      const authResult = authenticateUser(email, password);
+      // 1. Authenticate against Supabase Database with bcrypt password verification
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
 
-      if (!authResult.success) {
-        setError(authResult.error);
+      const authResult = await res.json();
+
+      if (!res.ok || !authResult.success) {
+        setError(authResult.error || 'Authentication failed. Please verify your credentials.');
         setLoading(false);
         return;
       }
