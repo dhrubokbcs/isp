@@ -286,3 +286,102 @@ export async function sendOtpEmail(params: {
   });
 }
 
+/**
+ * Dispatches an automated email notification when an admin resets a user's password.
+ * Provides the temporary password and instructions for changing it in the console.
+ */
+export async function sendAdminPasswordResetEmail(params: {
+  to: string;
+  userName: string;
+  newPassword: string;
+  loginUrl?: string;
+}): Promise<MailResult> {
+  const loginUrl =
+    params.loginUrl ||
+    (process.env.NEXT_PUBLIC_APP_URL
+      ? `${process.env.NEXT_PUBLIC_APP_URL}/console/login`
+      : 'https://console.ispctg.live/login');
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #F8FAFC; color: #172033; margin: 0; padding: 24px; }
+          .container { max-width: 540px; margin: 0 auto; background: #FFFFFF; border-radius: 14px; border: 1px solid #E2E8F0; overflow: hidden; }
+          .header { background-color: #061B57; color: #FFFFFF; padding: 28px 24px; text-align: center; }
+          .body { padding: 32px 28px; line-height: 1.6; }
+          .cred-box { background-color: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 10px; padding: 18px 20px; margin: 22px 0; }
+          .cred-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13.5px; }
+          .cred-label { color: #64748B; font-weight: 600; }
+          .cred-value { font-weight: 800; color: #061B57; }
+          .password-highlight { font-family: 'Courier New', monospace; font-size: 16px; color: #1748D1; letter-spacing: 1px; font-weight: 800; }
+          .steps-box { background-color: #EEF4FF; border-left: 4px solid #1748D1; border-radius: 6px; padding: 16px 20px; margin: 24px 0; }
+          .steps-title { font-size: 13.5px; font-weight: 800; color: #061B57; margin-top: 0; margin-bottom: 8px; }
+          .steps-list { margin: 0; padding-left: 20px; font-size: 13px; color: #334155; }
+          .steps-list li { margin-bottom: 6px; }
+          .btn { display: block; text-align: center; background-color: #1748D1; color: #FFFFFF !important; text-decoration: none; padding: 13px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; margin: 24px 0 16px; }
+          .notice { font-size: 12px; color: #64748B; border-top: 1px solid #F1F5F9; padding-top: 16px; margin-top: 24px; line-height: 1.5; }
+          .footer { background-color: #F8FAFC; padding: 18px; text-align: center; font-size: 12px; color: #64748B; border-top: 1px solid #E2E8F0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin: 0; font-size: 20px; letter-spacing: 0.5px;">Indicator Student's Point</h1>
+            <p style="margin: 4px 0 0; opacity: 0.85; font-size: 13px;">Institutional Portal &bull; Security Administration</p>
+          </div>
+          <div class="body">
+            <h2 style="color: #061B57; margin-top: 0; font-size: 18px;">Your Password Has Been Reset</h2>
+            <p style="font-size: 14px; color: #334155;">
+              Hello <strong>${params.userName || 'Valued User'}</strong>,
+            </p>
+            <p style="font-size: 14px; color: #334155;">
+              An institutional administrator has reset the password for your ISP Digital Campus console account. You can now log in using the credentials below:
+            </p>
+
+            <div class="cred-box">
+              <div class="cred-row">
+                <span class="cred-label">Login Email:</span>
+                <span class="cred-value">${params.to}</span>
+              </div>
+              <div class="cred-row" style="margin-bottom: 0;">
+                <span class="cred-label">New Password:</span>
+                <span class="password-highlight">${params.newPassword}</span>
+              </div>
+            </div>
+
+            <div class="steps-box">
+              <div class="steps-title">&#128274; Required Next Steps — Change Your Password:</div>
+              <ol class="steps-list">
+                <li>Click the <strong>Log In to Portal</strong> button below to open the console sign-in page.</li>
+                <li>Enter your registered email and the temporary password provided above.</li>
+                <li>Once logged in, click your <strong>Avatar menu</strong> in the top-right corner &rarr; select <strong>Account &amp; Security</strong>.</li>
+                <li>Under the <strong>Security</strong> tab, enter your temporary password as the current password, and choose a new personal, strong password.</li>
+              </ol>
+            </div>
+
+            <a href="${loginUrl}" class="btn" target="_blank">Log In to Portal &rarr;</a>
+
+            <div class="notice">
+              <strong>Security Advisory:</strong> If you did not request this password reset or believe this occurred in error, please immediately contact your campus administration or superadmin.
+            </div>
+          </div>
+          <div class="footer">
+            Indicator Student's Point (ISP) &bull; Chawkbazar, Chattogram<br>
+            Official Institutional Campus Portal &bull; All Rights Reserved
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  return sendMail({
+    to: params.to,
+    subject: `[ISP Security] Your Account Password Has Been Reset`,
+    html,
+    text: `Hello ${params.userName},\n\nAn administrator has reset your ISP console password.\n\nLogin Email: ${params.to}\nNew Password: ${params.newPassword}\n\nPlease log in at ${loginUrl} and change your password immediately under Account & Security.\n\nIndicator Student's Point`,
+  });
+}
+

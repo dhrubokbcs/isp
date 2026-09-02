@@ -237,7 +237,7 @@ export default function UsersManagementPage() {
       }
 
       navigator.clipboard.writeText(newPassword.trim());
-      success(`Password reset for ${resetUser.fullName}! New password copied to clipboard.`);
+      success(`Password reset for ${resetUser.fullName}! New credentials copied to clipboard and emailed to ${resetUser.email}.`);
       setResetUser(null);
     } catch (err: any) {
       toastError(err.message || 'Error resetting password');
@@ -828,7 +828,7 @@ export default function UsersManagementPage() {
                 />
               </Box>
               <Alert severity="info" sx={{ borderRadius: '8px', fontSize: '12.5px' }}>
-                The user can use this password to immediately authenticate to the portal.
+                An automated email containing this new password and security change instructions will be dispatched to <strong>{resetUser.email}</strong>.
               </Alert>
             </Stack>
           )}

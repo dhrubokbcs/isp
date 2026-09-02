@@ -1,5 +1,6 @@
 import { generateRandomPassword } from './teachers';
 import { hashPassword } from '@/lib/security/password';
+import { sendAdminPasswordResetEmail } from '@/lib/email/mailer';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lzckoyeouimyrjzcefkp.supabase.co';
 const SERVICE_KEY =
@@ -187,7 +188,7 @@ export async function updateUserPasswordInSupabase(
   id: string,
   newPassword: string
 ): Promise<{ success: boolean; message?: string }> {
-  const userRes = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${id}&select=id,role,metadata`, {
+  const userRes = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${id}&select=id,role,email,full_name,metadata`, {
     headers: getHeaders(),
   });
   const users = await userRes.json();
@@ -218,6 +219,19 @@ export async function updateUserPasswordInSupabase(
   if (!res.ok) {
     const err = await res.text();
     return { success: false, message: `Failed to update password: ${err}` };
+  }
+
+  // Automatically dispatch email notification to the user with the new password and instructions
+  if (target.email) {
+    try {
+      await sendAdminPasswordResetEmail({
+        to: target.email,
+        userName: target.full_name || 'Valued User',
+        newPassword: newPassword.trim(),
+      });
+    } catch (emailErr) {
+      console.error('Failed to dispatch password reset email to user:', emailErr);
+    }
   }
 
   return { success: true };
