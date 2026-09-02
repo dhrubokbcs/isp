@@ -31,6 +31,7 @@ import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import PrintRoundedIcon from '@mui/icons-material/PrintRounded';
 import PageHeader from '@/components/common/PageHeader';
 import StatusChip from '@/components/common/StatusChip';
+import { useToast } from '@/components/common/ToastProvider';
 import { ispColors } from '@/theme/colors';
 
 interface PaymentItem {
@@ -47,6 +48,7 @@ interface PaymentItem {
 }
 
 export default function PaymentsPage() {
+  const { success, info } = useToast();
   const [payments, setPayments] = React.useState<PaymentItem[]>([
     {
       id: 'p-1',
@@ -140,7 +142,7 @@ export default function PaymentsPage() {
 
       {successReceipt && (
         <Alert severity="success" sx={{ mb: 3, borderRadius: '10px' }}>
-          <strong>Payment Received!</strong> Official Receipt generated: <code>{successReceipt}</code>.
+          <strong>Payment Received!</strong> Official Receipt generated: <strong style={{ color: '#15965A' }}>{successReceipt}</strong>.
         </Alert>
       )}
 
@@ -165,14 +167,14 @@ export default function PaymentsPage() {
               <TableBody>
                 {payments.map((p) => (
                   <TableRow key={p.id} hover>
-                    <TableCell sx={{ fontFamily: 'monospace', fontWeight: 700, color: ispColors.primary[700] }}>
+                    <TableCell sx={{ fontWeight: 700, color: ispColors.primary[700] }}>
                       {p.receiptNo}
                     </TableCell>
-                    <TableCell sx={{ fontFamily: 'monospace', fontWeight: 600 }}>{p.studentId}</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: '#061B57' }}>{p.studentId}</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>{p.studentName}</TableCell>
                     <TableCell>{p.feeType}</TableCell>
                     <TableCell sx={{ fontWeight: 700, color: ispColors.semantic.success.dark }}>
-                      ৳ {p.amount.toLocaleString()}
+                      BDT {p.amount.toLocaleString()}
                     </TableCell>
                     <TableCell>
                       <StatusChip status={p.method} />
@@ -183,7 +185,7 @@ export default function PaymentsPage() {
                       <Tooltip title="Print Official Receipt">
                         <IconButton
                           size="small"
-                          onClick={() => alert(`Printing Receipt: ${p.receiptNo}\nStudent: ${p.studentName} (${p.studentId})\nAmount: ৳${p.amount}`)}
+                          onClick={() => info(`Printing Receipt ${p.receiptNo} for ${p.studentName} (BDT ${p.amount})`)}
                           sx={{ color: ispColors.primary[600] }}
                         >
                           <PrintRoundedIcon fontSize="small" />
@@ -213,9 +215,9 @@ export default function PaymentsPage() {
           <FormControl fullWidth>
             <InputLabel>Fee Type</InputLabel>
             <Select value={feeType} label="Fee Type" onChange={(e) => setFeeType(e.target.value)}>
-              <MenuItem value="September Monthly Tuition">September Monthly Tuition (৳2,500)</MenuItem>
-              <MenuItem value="Model Test Examination Fee">Model Test Examination Fee (৳500)</MenuItem>
-              <MenuItem value="Special Coaching Course Material">Special Coaching Course Material (৳800)</MenuItem>
+              <MenuItem value="September Monthly Tuition">September Monthly Tuition (BDT 2,500)</MenuItem>
+              <MenuItem value="Model Test Examination Fee">Model Test Examination Fee (BDT 500)</MenuItem>
+              <MenuItem value="Special Coaching Course Material">Special Coaching Course Material (BDT 800)</MenuItem>
             </Select>
           </FormControl>
 

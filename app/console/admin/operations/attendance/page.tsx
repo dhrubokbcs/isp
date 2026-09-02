@@ -178,7 +178,7 @@ export default function AttendanceMarkingPage() {
               <TableBody>
                 {students.map((student) => (
                   <TableRow key={student.studentId} hover>
-                    <TableCell sx={{ fontFamily: 'monospace', fontWeight: 700, color: ispColors.primary[700] }}>
+                    <TableCell sx={{ fontWeight: 700, color: ispColors.primary[700] }}>
                       {student.studentId}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 600, fontSize: '15px' }}>{student.fullName}</TableCell>

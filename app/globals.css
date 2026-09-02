@@ -1,5 +1,4 @@
 @import url('https://banglawebfonts.pages.dev/css/kalpurush.css');
-@import url('https://banglawebfonts.pages.dev/css/abu-sayed.css');
 @import url('https://banglawebfonts.pages.dev/css/bensen-handwriting.css');
 
 * {
@@ -24,15 +23,58 @@ a {
   text-decoration: none;
 }
 
-/* Bengali typography utilities */
-.font-bangla-heading {
-  font-family: 'Abu Sayed', sans-serif !important;
+/* ========================================================================= */
+/* PUBLIC FRONTEND TYPOGRAPHY ONLY (Does NOT affect Console / Admin)         */
+/* ========================================================================= */
+
+.public-frontend {
+  font-family: 'Kalpurush', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
 }
 
-.font-bangla-body {
+/* Headings in public frontend use Bensen Handwriting */
+.public-frontend h1,
+.public-frontend h2,
+.public-frontend h3,
+.public-frontend h4,
+.public-frontend h5,
+.public-frontend h6,
+.public-frontend .MuiTypography-h1,
+.public-frontend .MuiTypography-h2,
+.public-frontend .MuiTypography-h3,
+.public-frontend .MuiTypography-h4,
+.public-frontend .MuiTypography-h5,
+.public-frontend .MuiTypography-h6,
+.public-frontend .font-heading,
+.public-frontend .public-heading {
+  font-family: 'Bensen Handwriting', 'Kalpurush', cursive, sans-serif !important;
+}
+
+/* Regular body elements in public frontend use Kalpurush */
+.public-frontend p,
+.public-frontend span,
+.public-frontend a,
+.public-frontend button,
+.public-frontend input,
+.public-frontend select,
+.public-frontend textarea,
+.public-frontend label,
+.public-frontend li,
+.public-frontend .MuiTypography-body1,
+.public-frontend .MuiTypography-body2,
+.public-frontend .MuiTypography-caption,
+.public-frontend .MuiTypography-subtitle1,
+.public-frontend .MuiTypography-subtitle2,
+.public-frontend .MuiButton-root,
+.public-frontend .MuiChip-label {
+  font-family: 'Kalpurush', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+/* Specific utilities */
+.font-kalpurush {
   font-family: 'Kalpurush', sans-serif !important;
 }
 
+.font-bensen,
 .font-handwriting {
   font-family: 'Bensen Handwriting', cursive !important;
 }

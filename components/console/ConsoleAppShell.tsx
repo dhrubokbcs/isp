@@ -38,12 +38,14 @@ import AssignmentRoundedIcon from '@mui/icons-material/AssignmentRounded';
 import PaymentsRoundedIcon from '@mui/icons-material/PaymentsRounded';
 import CampaignRoundedIcon from '@mui/icons-material/CampaignRounded';
 import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
+import ManageAccountsRoundedIcon from '@mui/icons-material/ManageAccountsRounded';
 import SecurityRoundedIcon from '@mui/icons-material/SecurityRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded';
 import { ispColors } from '@/theme/colors';
 
 const DRAWER_WIDTH = 270;
+const HEADER_HEIGHT = 64;
 
 interface NavItem {
   label: string;
@@ -124,6 +126,12 @@ const navSections: NavSection[] = [
   {
     title: 'PEOPLE',
     items: [
+      {
+        label: 'Users',
+        href: '/admin/people/users',
+        icon: <ManageAccountsRoundedIcon fontSize="small" />,
+        roles: ['SUPERADMIN', 'ADMIN'],
+      },
       {
         label: 'Students',
         href: '/admin/people/students',
@@ -272,7 +280,10 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
       {/* Brand Header */}
       <Box
         sx={{
-          height: 68,
+          height: HEADER_HEIGHT,
+          minHeight: `${HEADER_HEIGHT}px`,
+          maxHeight: `${HEADER_HEIGHT}px`,
+          boxSizing: 'border-box',
           display: 'flex',
           alignItems: 'center',
           px: 3,
@@ -306,25 +317,7 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
         </Box>
       </Box>
 
-      {/* Role Badge Indicator */}
-      <Box sx={{ px: 2.5, py: 2, bgcolor: ispColors.background.default, borderBottom: `1px solid ${ispColors.border.subtle}` }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-            LOGGED IN AS:
-          </Typography>
-          <Chip
-            label={userRole}
-            size="small"
-            sx={{
-              height: '22px',
-              fontSize: '11px',
-              fontWeight: 700,
-              bgcolor: userRole === 'SUPERADMIN' ? '#FEF3C7' : ispColors.primary[100],
-              color: userRole === 'SUPERADMIN' ? '#92400E' : ispColors.primary[800],
-            }}
-          />
-        </Box>
-      </Box>
+
 
       {/* Navigation Sections */}
       <Box sx={{ flexGrow: 1, overflowY: 'auto', px: 1.5, py: 2 }}>
@@ -433,11 +426,23 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
           color: 'text.primary',
           borderBottom: `1px solid ${ispColors.border.default}`,
           boxShadow: 'none',
-          height: 68,
+          height: HEADER_HEIGHT,
+          minHeight: `${HEADER_HEIGHT}px`,
+          maxHeight: `${HEADER_HEIGHT}px`,
+          boxSizing: 'border-box',
           justifyContent: 'center',
         }}
       >
-        <Toolbar sx={{ justifyContent: 'space-between', px: { xs: 2, sm: 3 } }}>
+        <Toolbar
+          disableGutters
+          sx={{
+            height: HEADER_HEIGHT,
+            minHeight: `${HEADER_HEIGHT}px !important`,
+            maxHeight: `${HEADER_HEIGHT}px`,
+            px: { xs: 2, sm: 3 },
+            justifyContent: 'space-between',
+          }}
+        >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <IconButton
               color="inherit"
@@ -554,8 +559,8 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
           flexGrow: 1,
           p: { xs: 2.5, sm: 4 },
           width: { lg: `calc(100% - ${DRAWER_WIDTH}px)` },
-          mt: '68px',
-          minHeight: 'calc(100vh - 68px)',
+          mt: `${HEADER_HEIGHT}px`,
+          minHeight: `calc(100vh - ${HEADER_HEIGHT}px)`,
         }}
       >
         {children}

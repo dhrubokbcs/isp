@@ -202,7 +202,7 @@ export default function CadminDashboardPage() {
                     Recent Student Admissions
                   </Typography>
                   <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    Permanent Student ID Format: <code>YYYYSSSS</code>
+                    Permanent Student ID Format: <strong style={{ color: '#1748D1' }}>YYYYSSSS</strong>
                   </Typography>
                 </Box>
                 <Button
@@ -232,8 +232,8 @@ export default function CadminDashboardPage() {
                       { id: '20280040', name: 'Mahir Faisal', batch: 'Class 9 Morning A', date: '30 Aug 2028', status: 'ACTIVE' },
                       { id: '20280039', name: 'Sabrina Hossain', batch: 'University Admission', date: '29 Aug 2028', status: 'ACTIVE' },
                     ].map((student) => (
-                      <TableRow key={student.id} hover>
-                        <TableCell sx={{ fontFamily: 'monospace', fontWeight: 700, color: ispColors.primary[700] }}>
+                      <TableRow key={student.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                        <TableCell sx={{ fontWeight: 700, color: '#1748D1' }}>
                           {student.id}
                         </TableCell>
                         <TableCell sx={{ fontWeight: 600 }}>{student.name}</TableCell>
@@ -311,17 +311,17 @@ export default function CadminDashboardPage() {
                   Total September Collection
                 </Typography>
                 <Typography variant="h4" sx={{ fontWeight: 700, color: ispColors.semantic.success.dark }}>
-                  ৳ 3,42,500
+                  BDT 342,500
                 </Typography>
               </Box>
               <Divider sx={{ my: 1.5 }} />
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>Pending Fees Due</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 700, color: ispColors.semantic.warning.dark }}>৳ 48,000</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: ispColors.semantic.warning.dark }}>BDT 48,000</Typography>
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>Waiver / Discounts</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>৳ 12,500</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>BDT 12,500</Typography>
               </Box>
             </CardContent>
           </Card>

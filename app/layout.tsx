@@ -23,6 +23,8 @@ export default function RootLayout({
     <html lang="en" className={inter.variable}>
       <head>
         <meta name="viewport" content="initial-scale=1, width=device-width" />
+        <link rel="stylesheet" href="https://banglawebfonts.pages.dev/css/kalpurush.css" />
+        <link rel="stylesheet" href="https://banglawebfonts.pages.dev/css/bensen-handwriting.css" />
       </head>
       <body>
         <MuiProvider>{children}</MuiProvider>

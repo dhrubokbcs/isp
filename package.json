@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:push": "supabase db push",
+    "db:status": "supabase migration list",
+    "db:pull": "supabase db pull",
+    "db:new": "supabase migration new"
   },
   "dependencies": {
     "@emotion/cache": "^11.14.0",
