@@ -4,11 +4,16 @@ import { fetchBatchesFromSupabase, fetchSubjectsFromSupabase } from './supabaseA
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-const getHeaders = () => ({
-  apikey: SUPABASE_SERVICE_ROLE_KEY,
-  Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-  'Content-Type': 'application/json',
-});
+const getHeaders = () => {
+  if (!SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Server configuration error: SUPABASE_SERVICE_ROLE_KEY is required.');
+  }
+  return {
+    apikey: SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    'Content-Type': 'application/json',
+  };
+};
 
 export interface AttendanceStudentRow {
   studentDbId: string;
@@ -29,25 +34,25 @@ export interface ClassSessionRecord {
   status: string;
 }
 
-export async function getOrCreateSession(
+/**
+ * Pure read-only query to find existing session without state mutation
+ */
+export async function findExistingSession(
   batchId: string,
   subjectName: string,
-  date: string,
-  startTime: string = '10:00:00',
-  endTime: string = '11:30:00'
+  date: string
 ): Promise<ClassSessionRecord | null> {
   try {
-    // 1. Check existing session for this batch, date, and subject
     const checkRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/class_sessions?batch_id=eq.${batchId}&session_date=eq.${date}&subject_name=eq.${encodeURIComponent(
+      `${SUPABASE_URL}/rest/v1/class_sessions?batch_id=eq.${encodeURIComponent(batchId)}&session_date=eq.${encodeURIComponent(date)}&subject_name=eq.${encodeURIComponent(
         subjectName
-      )}&select=*`,
-      { headers: getHeaders() }
+      )}&select=*&limit=1`,
+      { headers: getHeaders(), cache: 'no-store' }
     );
 
     if (checkRes.ok) {
       const existing = await checkRes.json();
-      if (existing && existing.length > 0) {
+      if (Array.isArray(existing) && existing.length > 0) {
         const row = existing[0];
         return {
           id: row.id,
@@ -60,8 +65,25 @@ export async function getOrCreateSession(
         };
       }
     }
+    return null;
+  } catch (err) {
+    console.error('Error in findExistingSession:', err);
+    return null;
+  }
+}
 
-    // 2. Create session if not found
+export async function getOrCreateSession(
+  batchId: string,
+  subjectName: string,
+  date: string,
+  startTime: string = '10:00:00',
+  endTime: string = '11:30:00'
+): Promise<ClassSessionRecord | null> {
+  try {
+    const existing = await findExistingSession(batchId, subjectName, date);
+    if (existing) return existing;
+
+    // Create session
     const createRes = await fetch(`${SUPABASE_URL}/rest/v1/class_sessions`, {
       method: 'POST',
       headers: {
@@ -102,8 +124,8 @@ export async function getOrCreateSession(
 export async function getExistingAttendance(sessionId: string): Promise<Record<string, 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED'>> {
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/attendance_records?session_id=eq.${sessionId}&select=student_id,status`,
-      { headers: getHeaders() }
+      `${SUPABASE_URL}/rest/v1/attendance_records?session_id=eq.${encodeURIComponent(sessionId)}&select=student_id,status`,
+      { headers: getHeaders(), cache: 'no-store' }
     );
 
     if (!res.ok) return {};
@@ -122,34 +144,33 @@ export async function getExistingAttendance(sessionId: string): Promise<Record<s
 
 export async function saveAttendanceToSupabase(
   sessionId: string,
-  records: { studentDbId: string; status: 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED' }[]
+  records: Array<{ studentId: string; status: 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED' }>
 ): Promise<boolean> {
   try {
-    if (!sessionId || records.length === 0) return true;
+    // 1. Delete previous records for this session
+    await fetch(`${SUPABASE_URL}/rest/v1/attendance_records?session_id=eq.${encodeURIComponent(sessionId)}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
 
+    // 2. Insert new records in batch
     const payload = records.map((r) => ({
       session_id: sessionId,
-      student_id: r.studentDbId,
+      student_id: r.studentId,
       status: r.status,
-      marked_at: new Date().toISOString(),
+      timestamp: new Date().toISOString(),
     }));
 
-    // Upsert into public.attendance_records using on_conflict (session_id, student_id)
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/attendance_records?on_conflict=session_id,student_id`, {
+    const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/attendance_records`, {
       method: 'POST',
       headers: {
         ...getHeaders(),
-        Prefer: 'resolution=merge-duplicates,return=representation',
+        Prefer: 'return=minimal',
       },
       body: JSON.stringify(payload),
     });
 
-    if (!res.ok) {
-      console.error('Failed to upsert attendance_records:', await res.text());
-      return false;
-    }
-
-    return true;
+    return insertRes.ok;
   } catch (err) {
     console.error('Error in saveAttendanceToSupabase:', err);
     return false;

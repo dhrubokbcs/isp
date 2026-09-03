@@ -1,19 +1,17 @@
--- Migration: Add subjects and rooms tables for Academic Module
-
--- 1. Academic Subjects Catalog
+-- Create subjects table if not exists
 CREATE TABLE IF NOT EXISTS public.subjects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(150) NOT NULL,
     code VARCHAR(50) NOT NULL UNIQUE,
-    department VARCHAR(50) NOT NULL DEFAULT 'GENERAL',
-    target_level VARCHAR(100),
+    name VARCHAR(150) NOT NULL,
+    department VARCHAR(100) NOT NULL DEFAULT 'GENERAL',
+    target_level VARCHAR(100) NOT NULL DEFAULT 'CLASS_10',
     total_weekly_classes INT NOT NULL DEFAULT 3,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 2. Campus Rooms & Laboratories
+-- Create rooms table if not exists
 CREATE TABLE IF NOT EXISTS public.rooms (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     room_number VARCHAR(50) NOT NULL UNIQUE,
@@ -26,6 +24,12 @@ CREATE TABLE IF NOT EXISTS public.rooms (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Grant full access to authenticated & service_role
-GRANT ALL ON TABLE public.subjects TO postgres, service_role, authenticated, anon;
-GRANT ALL ON TABLE public.rooms TO postgres, service_role, authenticated, anon;
+-- Enable RLS and grant access to service_role and authenticated users
+ALTER TABLE public.subjects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.rooms ENABLE ROW LEVEL SECURITY;
+
+GRANT ALL ON TABLE public.subjects TO postgres, service_role;
+GRANT ALL ON TABLE public.rooms TO postgres, service_role;
+
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.subjects FROM anon;
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.rooms FROM anon;

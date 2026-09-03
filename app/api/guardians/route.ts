@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { fetchGuardiansFromSupabase, updateGuardianDetailsInSupabase } from '@/lib/db/supabaseGuardians';
+import { requireAdmin } from '@/lib/auth/requireSession';
 
 export async function GET(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q') || undefined;
     const filter = searchParams.get('filter') || undefined;
@@ -21,6 +25,9 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const body = await request.json();
     const { id, ...updates } = body;
 

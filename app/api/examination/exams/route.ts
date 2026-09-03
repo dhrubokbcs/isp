@@ -4,13 +4,16 @@ import {
   createExamInSupabase,
   updateExamInSupabase,
   deleteExamInSupabase,
-  ExamRecord,
 } from '@/lib/db/supabaseExams';
 import { fetchBatchesFromSupabase } from '@/lib/db/supabaseAcademics';
 import { fetchTeachersFromSupabase } from '@/lib/db/supabaseTeachers';
+import { requireAdmin, requireUser } from '@/lib/auth/requireSession';
 
 export async function GET(request: Request) {
   try {
+    const auth = await requireUser(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('query') || undefined;
     const batch = searchParams.get('batch') || undefined;
@@ -49,6 +52,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const body = await request.json();
     const {
       title,
@@ -120,6 +126,9 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const body = await request.json();
     const { id, ...updates } = body;
 
@@ -153,6 +162,9 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 

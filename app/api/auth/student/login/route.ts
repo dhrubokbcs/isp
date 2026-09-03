@@ -1,18 +1,36 @@
 import { NextResponse } from 'next/server';
 import { verifyPassword, hashPassword } from '@/lib/security/password';
 import { setStudentSessionCookie, StudentSessionPayload } from '@/lib/auth/studentSession';
+import { checkRateLimit, getClientIp } from '@/lib/security/rateLimit';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lzckoyeouimyrjzcefkp.supabase.co';
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-const getHeaders = () => ({
-  apikey: SERVICE_KEY,
-  Authorization: `Bearer ${SERVICE_KEY}`,
-  'Content-Type': 'application/json',
-});
+const getHeaders = () => {
+  if (!SERVICE_KEY) {
+    throw new Error('Server configuration error: SUPABASE_SERVICE_ROLE_KEY is required.');
+  }
+  return {
+    apikey: SERVICE_KEY,
+    Authorization: `Bearer ${SERVICE_KEY}`,
+    'Content-Type': 'application/json',
+  };
+};
 
 export async function POST(request: Request) {
   try {
+    const ip = getClientIp(request);
+    const rateLimit = checkRateLimit(`student_login:${ip}`, 10, 15 * 60 * 1000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Too many login attempts. Please try again in ${rateLimit.resetInSeconds} seconds.`,
+        },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const studentIdRaw = body.studentId || body.identifier;
     const password = body.password;
@@ -131,6 +149,7 @@ export async function POST(request: Request) {
       role: 'STUDENT',
       avatarUrl: userRow.avatar_url || meta.avatarUrl || undefined,
       issuedAt: Date.now(),
+      expiresAt: Date.now() + 60 * 60 * 24 * 7 * 1000,
     };
 
     // 6. Create Response and set secure HTTP-only cookie

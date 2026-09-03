@@ -6,9 +6,13 @@ import {
   deleteStudentInSupabase,
 } from '@/lib/db/supabaseStudents';
 import { sendStudentAdmissionWelcomeEmail } from '@/lib/email/mailer';
+import { requireAdmin, requireTeacherOrAdmin } from '@/lib/auth/requireSession';
 
 export async function GET(request: Request) {
   try {
+    const auth = await requireTeacherOrAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q') || undefined;
 
@@ -26,6 +30,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const body = await request.json();
     const { fullName, admissionYear } = body;
 
@@ -56,6 +63,9 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const body = await request.json();
     const { id, action, ...updates } = body;
 
@@ -78,6 +88,9 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 

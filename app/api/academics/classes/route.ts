@@ -6,9 +6,13 @@ import {
   seedStandardClassLevelsInSupabase,
   deleteClassLevelInSupabase,
 } from '@/lib/db/supabaseAcademics';
+import { requireAdmin, requireUser } from '@/lib/auth/requireSession';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const auth = await requireUser(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const classLevels = await fetchClassLevelsFromSupabase();
     return NextResponse.json({
       success: true,
@@ -23,6 +27,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const body = await request.json();
 
     if (body.action === 'SEED') {
@@ -54,6 +61,9 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const body = await request.json();
     const { id, name, numericLevel } = body;
 
@@ -74,6 +84,9 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 

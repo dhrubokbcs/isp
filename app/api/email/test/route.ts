@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { verifyGmailConnection, sendTestEmail } from '@/lib/email/mailer';
+import { requireSuperAdmin } from '@/lib/auth/requireSession';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const auth = await requireSuperAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const isConfigured = Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
     const verification = await verifyGmailConnection();
 
@@ -19,6 +23,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireSuperAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const body = await request.json();
     const { to } = body;
 

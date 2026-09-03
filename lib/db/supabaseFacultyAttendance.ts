@@ -8,13 +8,13 @@ import {
 export type { FacultyAttendanceRecord, AttendanceStats };
 export { parseDurationToMinutes, calculateDurationString };
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lzckoyeouimyrjzcefkp.supabase.co';
-const SERVICE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  '';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 function getHeaders() {
+  if (!SERVICE_KEY) {
+    throw new Error('Server configuration error: SUPABASE_SERVICE_ROLE_KEY is required.');
+  }
   return {
     apikey: SERVICE_KEY,
     Authorization: `Bearer ${SERVICE_KEY}`,

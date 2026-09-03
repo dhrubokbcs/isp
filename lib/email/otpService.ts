@@ -1,17 +1,23 @@
+import crypto from 'crypto';
 import { sendOtpEmail } from './mailer';
 import { hashPassword } from '@/lib/security/password';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-const getHeaders = () => ({
-  apikey: SUPABASE_SERVICE_ROLE_KEY,
-  Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-  'Content-Type': 'application/json',
-});
+const getHeaders = () => {
+  if (!SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Server configuration error: SUPABASE_SERVICE_ROLE_KEY is required.');
+  }
+  return {
+    apikey: SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    'Content-Type': 'application/json',
+  };
+};
 
 interface StoredOtp {
-  code: string;
+  hashedCode: string;
   purpose: 'PASSWORD_RESET' | 'EMAIL_CHANGE';
   email: string;
   newEmail?: string;
@@ -26,8 +32,12 @@ function getStoreKey(email: string, purpose: string): string {
   return `${email.toLowerCase().trim()}_${purpose}`;
 }
 
+function hashOtp(code: string): string {
+  return crypto.createHash('sha256').update(code).digest('hex');
+}
+
 /**
- * Generate a 6-digit numeric OTP, store it, and dispatch it via Gmail Nodemailer.
+ * Generate a cryptographically secure 6-digit numeric OTP, store its hash, and dispatch via Email.
  */
 export async function generateAndSendOtp(params: {
   email: string;
@@ -37,29 +47,36 @@ export async function generateAndSendOtp(params: {
 }): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
     const cleanEmail = params.email.toLowerCase().trim();
-    const destinationEmail = params.purpose === 'EMAIL_CHANGE' && params.newEmail ? params.newEmail.toLowerCase().trim() : cleanEmail;
+    const destinationEmail =
+      params.purpose === 'EMAIL_CHANGE' && params.newEmail ? params.newEmail.toLowerCase().trim() : cleanEmail;
 
-    // 1. Verify user exists if PASSWORD_RESET
+    // 1. Verify user exists if PASSWORD_RESET (generic message returned for privacy)
     if (params.purpose === 'PASSWORD_RESET') {
-      const userRes = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(cleanEmail)}&select=id,full_name`, {
-        headers: getHeaders(),
-      });
+      const userRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(cleanEmail)}&select=id,full_name`,
+        { headers: getHeaders() }
+      );
       if (userRes.ok) {
         const users = await userRes.json();
         if (!users || users.length === 0) {
-          return { success: false, error: 'No account registered with this email address.' };
+          // Return generic message to prevent account enumeration
+          return {
+            success: true,
+            message: `If an account exists for ${destinationEmail}, a verification code has been sent.`,
+          };
         }
       }
     }
 
-    // 2. Generate 6-digit OTP (e.g. 748291)
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    // 2. Generate cryptographically secure 6-digit OTP (100000 - 999999)
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
+    const hashedCode = hashOtp(otpCode);
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
 
-    // 3. Store OTP in memory store
+    // 3. Store hashed OTP in memory store
     const storeKey = getStoreKey(cleanEmail, params.purpose);
     otpStore.set(storeKey, {
-      code: otpCode,
+      hashedCode,
       purpose: params.purpose,
       email: cleanEmail,
       newEmail: params.newEmail ? params.newEmail.toLowerCase().trim() : undefined,
@@ -67,11 +84,12 @@ export async function generateAndSendOtp(params: {
       attempts: 0,
     });
 
-    // Also persist in user metadata in Supabase for resilience
+    // Also persist hashed OTP in user metadata in Supabase for resilience
     try {
-      const userCheck = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(cleanEmail)}&select=id,metadata`, {
-        headers: getHeaders(),
-      });
+      const userCheck = await fetch(
+        `${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(cleanEmail)}&select=id,metadata`,
+        { headers: getHeaders() }
+      );
       if (userCheck.ok) {
         const rows = await userCheck.json();
         if (rows && rows.length > 0) {
@@ -83,7 +101,7 @@ export async function generateAndSendOtp(params: {
               metadata: {
                 ...(user.metadata || {}),
                 pending_otp: {
-                  code: otpCode,
+                  hashedCode,
                   purpose: params.purpose,
                   newEmail: params.newEmail,
                   expiresAt,
@@ -94,7 +112,7 @@ export async function generateAndSendOtp(params: {
         }
       }
     } catch (persistErr) {
-      console.warn('Could not persist OTP in DB metadata, relying on memory store:', persistErr);
+      console.warn('Could not persist OTP hash in DB metadata, relying on memory store:', persistErr);
     }
 
     // 4. Dispatch Email via Gmail Nodemailer
@@ -139,16 +157,17 @@ export async function verifyOtpAndExecute(params: {
 
     // Fallback: Check Supabase DB metadata if memory store missed
     if (!record) {
-      const userCheck = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(cleanEmail)}&select=id,metadata`, {
-        headers: getHeaders(),
-      });
+      const userCheck = await fetch(
+        `${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(cleanEmail)}&select=id,metadata`,
+        { headers: getHeaders() }
+      );
       if (userCheck.ok) {
         const rows = await userCheck.json();
         if (rows && rows.length > 0) {
           const pending = rows[0].metadata?.pending_otp;
           if (pending && pending.purpose === params.purpose) {
             record = {
-              code: pending.code,
+              hashedCode: pending.hashedCode || hashOtp(pending.code || ''),
               purpose: pending.purpose,
               email: cleanEmail,
               newEmail: pending.newEmail,
@@ -169,7 +188,14 @@ export async function verifyOtpAndExecute(params: {
       return { success: false, error: 'This verification code has expired. Please request a new one.' };
     }
 
-    if (record.code !== inputCode) {
+    const inputHash = hashOtp(inputCode);
+    const expectedBuffer = Buffer.from(record.hashedCode, 'hex');
+    const inputBuffer = Buffer.from(inputHash, 'hex');
+
+    const matches =
+      expectedBuffer.length === inputBuffer.length && crypto.timingSafeEqual(expectedBuffer, inputBuffer);
+
+    if (!matches) {
       record.attempts += 1;
       if (record.attempts >= 5) {
         otpStore.delete(storeKey);
@@ -185,14 +211,15 @@ export async function verifyOtpAndExecute(params: {
     // ACTION 1: PASSWORD RESET
     // -------------------------------------------------------------
     if (params.purpose === 'PASSWORD_RESET') {
-      if (!params.newPassword || params.newPassword.length < 6) {
-        return { success: false, error: 'New password must be at least 6 characters.' };
+      if (!params.newPassword || params.newPassword.length < 8) {
+        return { success: false, error: 'New password must be at least 8 characters.' };
       }
 
       // Find user
-      const userCheck = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(cleanEmail)}&select=id,metadata`, {
-        headers: getHeaders(),
-      });
+      const userCheck = await fetch(
+        `${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(cleanEmail)}&select=id,metadata`,
+        { headers: getHeaders() }
+      );
       if (!userCheck.ok) return { success: false, error: 'User lookup failed.' };
       const rows = await userCheck.json();
       if (!rows || rows.length === 0) return { success: false, error: 'User not found.' };
@@ -225,15 +252,19 @@ export async function verifyOtpAndExecute(params: {
     // ACTION 2: EMAIL CHANGE
     // -------------------------------------------------------------
     if (params.purpose === 'EMAIL_CHANGE') {
-      const targetNewEmail = (params.newEmail || record.newEmail || '').toLowerCase().trim();
-      if (!targetNewEmail || !targetNewEmail.includes('@')) {
-        return { success: false, error: 'Valid new email address is required.' };
+      if (!record.newEmail) {
+        return { success: false, error: 'No new email address was attached to this verification code.' };
       }
+      if (params.newEmail && params.newEmail.toLowerCase().trim() !== record.newEmail) {
+        return { success: false, error: 'Verification email mismatch. The code was issued for a different address.' };
+      }
+      const targetNewEmail = record.newEmail;
 
       // Check if new email is already taken by another user
-      const duplicateCheck = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(targetNewEmail)}&select=id`, {
-        headers: getHeaders(),
-      });
+      const duplicateCheck = await fetch(
+        `${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(targetNewEmail)}&select=id`,
+        { headers: getHeaders() }
+      );
       if (duplicateCheck.ok) {
         const dupes = await duplicateCheck.json();
         if (dupes && dupes.length > 0) {
@@ -242,9 +273,10 @@ export async function verifyOtpAndExecute(params: {
       }
 
       // Find user by old email
-      const userCheck = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(cleanEmail)}&select=id,metadata`, {
-        headers: getHeaders(),
-      });
+      const userCheck = await fetch(
+        `${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(cleanEmail)}&select=id,metadata`,
+        { headers: getHeaders() }
+      );
       if (!userCheck.ok) return { success: false, error: 'User lookup failed.' };
       const rows = await userCheck.json();
       if (!rows || rows.length === 0) return { success: false, error: 'User not found.' };

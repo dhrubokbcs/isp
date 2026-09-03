@@ -1,25 +1,25 @@
 import { NextResponse } from 'next/server';
 import { fetchUserAccount, updateUserAccount } from '@/lib/db/supabaseAccount';
-
-function getCookieValue(cookieHeader: string | null, name: string): string | undefined {
-  if (!cookieHeader) return undefined;
-  const match = cookieHeader.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : undefined;
-}
+import { requireUser } from '@/lib/auth/requireSession';
 
 export async function GET(request: Request) {
   try {
+    const auth = await requireUser(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const { searchParams } = new URL(request.url);
-    const cookieHeader = request.headers.get('cookie');
-    
-    const cookieUid = getCookieValue(cookieHeader, 'isp_console_uid');
-    const cookieRole = getCookieValue(cookieHeader, 'isp_console_role');
+    const queryUserId = searchParams.get('userId');
 
-    const userId = searchParams.get('userId') || cookieUid || undefined;
-    const role = searchParams.get('role') || cookieRole || undefined;
-    const email = searchParams.get('email') || undefined;
+    let targetUserId = auth.user.id;
+    let targetRole = auth.user.role;
 
-    const account = await fetchUserAccount(userId, role, email);
+    // Allow Admin/Superadmin to view other users' accounts if requested
+    if (queryUserId && (auth.user.role === 'SUPERADMIN' || auth.user.role === 'ADMIN')) {
+      targetUserId = queryUserId;
+      targetRole = (searchParams.get('role') as any) || undefined;
+    }
+
+    const account = await fetchUserAccount(targetUserId, targetRole, auth.user.email);
     if (!account) {
       return NextResponse.json({ success: false, error: 'User account not found' }, { status: 404 });
     }
@@ -35,11 +35,20 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const auth = await requireUser(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const body = await request.json();
     const { userId, ...data } = body;
 
-    if (!userId) {
-      return NextResponse.json({ success: false, error: 'userId is required' }, { status: 400 });
+    const targetUserId = userId || auth.user.id;
+
+    // Users can only edit their own account unless they are Superadmin / Admin
+    if (targetUserId !== auth.user.id && auth.user.role !== 'SUPERADMIN' && auth.user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden. You can only update your own account.' },
+        { status: 403 }
+      );
     }
 
     // Validate MFS number if provided in payout
@@ -57,12 +66,12 @@ export async function PATCH(request: Request) {
       }
     }
 
-    const ok = await updateUserAccount(userId, data);
+    const ok = await updateUserAccount(targetUserId, data);
     if (!ok) {
       return NextResponse.json({ success: false, error: 'Failed to update account' }, { status: 500 });
     }
 
-    const updated = await fetchUserAccount(userId);
+    const updated = await fetchUserAccount(targetUserId);
     return NextResponse.json({ success: true, account: updated });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

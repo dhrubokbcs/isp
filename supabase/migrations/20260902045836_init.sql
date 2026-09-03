@@ -277,7 +277,7 @@ INSERT INTO public.users (
 ) VALUES (
     'bdb8b059-c893-47d6-a142-1d27dd0fd210',
     'sadiworkmail@gmail.com',
-    's01836650S@&',
+    '$2a$12$e6QZ12Z3YI3Z13Z3YI3Z1uU1z6kF.kS/Jp52N98wN2dYV8oR3bU1m',
     'Tanvir Hasan Sadi',
     'SUPERADMIN',
     'ACTIVE'

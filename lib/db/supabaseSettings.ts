@@ -1,10 +1,10 @@
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lzckoyeouimyrjzcefkp.supabase.co';
-const SERVICE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  '';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 function getHeaders() {
+  if (!SERVICE_KEY) {
+    throw new Error('Server configuration error: SUPABASE_SERVICE_ROLE_KEY is required.');
+  }
   return {
     apikey: SERVICE_KEY,
     Authorization: `Bearer ${SERVICE_KEY}`,
@@ -23,7 +23,7 @@ export interface AttendanceSystemSettings {
 
 let memorySettings: AttendanceSystemSettings = {
   allowTeacherSelfAttendance: true,
-  allowQrAttendance: true,
+  allowQrAttendance: false, // Secure default: Disabled until explicitly enabled by Admin
   lateGraceMinutes: 10,
   autoNotifyAdminsOnLate: false,
   requireStudentCountOnExit: true,
@@ -45,7 +45,7 @@ export async function getAttendanceSettings(): Promise<AttendanceSystemSettings>
         memorySettings = { ...memorySettings, ...rows[0].value };
       }
     }
-  } catch (err) {
+  } catch {
     // fallback to memory
   }
   return memorySettings;

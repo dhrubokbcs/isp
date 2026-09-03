@@ -22,17 +22,9 @@ CREATE INDEX IF NOT EXISTS idx_rooms_status ON public.rooms(status);
 -- 3. Enable Row Level Security (RLS)
 ALTER TABLE public.rooms ENABLE ROW LEVEL SECURITY;
 
--- 4. Permissive policies for full CRUD access
-DROP POLICY IF EXISTS "Allow all operations for service_role and authenticated users" ON public.rooms;
-CREATE POLICY "Allow all operations for service_role and authenticated users"
-ON public.rooms
-FOR ALL
-TO public
-USING (true)
-WITH CHECK (true);
+-- 4. Grant Table Permissions & Restrict Anon Writes
+GRANT ALL ON TABLE public.rooms TO postgres, service_role;
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.rooms FROM anon;
 
--- 5. Grant Table Permissions
-GRANT ALL ON TABLE public.rooms TO postgres, service_role, authenticated, anon;
-
--- 6. Reload Supabase PostgREST Schema Cache
+-- 5. Reload Supabase PostgREST Schema Cache
 NOTIFY pgrst, 'reload schema';

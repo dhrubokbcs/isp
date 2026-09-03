@@ -123,15 +123,8 @@ export default function KioskPunchPage() {
       return;
     }
 
-    // Verify 4-digit PIN: matches last 4 digits of phone number or employeeId number
-    const phoneLast4 = selectedTeacher.mobile.replace(/\D/g, '').slice(-4);
-    const empDigits = selectedTeacher.employeeId.replace(/\D/g, '');
-    const validPin = pin.trim() === phoneLast4 || pin.trim() === empDigits || pin.trim() === '1234';
-
-    if (pin.trim().length < 4 || !validPin) {
-      setErrorMessage(
-        `Invalid PIN. Please enter the last 4 digits of your registered mobile number (${selectedTeacher.mobile ? `***${phoneLast4}` : '1234'}).`
-      );
+    if (!pin.trim()) {
+      setErrorMessage('Please enter your portal password or security PIN to verify your punch.');
       return;
     }
 

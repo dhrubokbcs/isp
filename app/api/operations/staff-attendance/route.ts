@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { fetchStaffAttendanceForDate, punchStaffAttendance } from '@/lib/db/supabaseStaffAttendance';
+import { requireAdmin } from '@/lib/auth/requireSession';
 
 export async function GET(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date') || new Date().toISOString().split('T')[0];
     const records = await fetchStaffAttendanceForDate(date);
@@ -14,6 +18,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const body = await request.json();
     if (!body.id) {
       return NextResponse.json({ success: false, error: 'Staff Record ID is required.' }, { status: 400 });

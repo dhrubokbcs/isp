@@ -266,25 +266,6 @@ INSERT INTO public.programs (name, code, description) VALUES
 ('University & Medical Admission', 'ADMISSION', 'Intensive coaching for engineering, medical, and public university entrance')
 ON CONFLICT (code) DO NOTHING;
 
--- Superadmin User
-INSERT INTO public.users (
-    id,
-    email,
-    password_hash,
-    full_name,
-    role,
-    status
-) VALUES (
-    'bdb8b059-c893-47d6-a142-1d27dd0fd210',
-    'sadiworkmail@gmail.com',
-    's01836650S@&',
-    'Tanvir Hasan Sadi',
-    'SUPERADMIN',
-    'ACTIVE'
-) ON CONFLICT (email) DO UPDATE SET
-    role = 'SUPERADMIN',
-    status = 'ACTIVE',
-    updated_at = NOW();
 
 -- 15. EXAMS & SCHEDULES TABLE
 CREATE TABLE IF NOT EXISTS public.exams (
@@ -319,13 +300,6 @@ CREATE INDEX IF NOT EXISTS idx_exams_status ON public.exams(status);
 
 ALTER TABLE public.exams ENABLE ROW LEVEL SECURITY;
 
-DO $$ BEGIN
-    DROP POLICY IF EXISTS "Allow all access to exams" ON public.exams;
-    CREATE POLICY "Allow all access to exams"
-        ON public.exams
-        FOR ALL
-        TO authenticated, anon, service_role
-        USING (true)
-        WITH CHECK (true);
-END $$;
+GRANT ALL ON TABLE public.exams TO postgres, service_role;
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.exams FROM anon;
 

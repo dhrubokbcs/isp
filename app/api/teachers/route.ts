@@ -6,9 +6,13 @@ import {
   updateTeacherInSupabase,
 } from '@/lib/db/supabaseTeachers';
 import { sendUserCredentialsWelcomeEmail } from '@/lib/email/mailer';
+import { requireAdmin, requireUser } from '@/lib/auth/requireSession';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const auth = await requireUser(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const teachers = await fetchTeachersFromSupabase();
     const nextEmployeeId = await getNextEmployeeIdFromSupabase();
 
@@ -30,6 +34,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const body = await request.json();
     const {
       fullName,
@@ -100,6 +107,9 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const body = await request.json();
     const { employeeId, ...updates } = body;
     if (!employeeId) {

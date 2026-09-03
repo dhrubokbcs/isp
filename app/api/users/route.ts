@@ -8,9 +8,13 @@ import {
   deleteUserInSupabase,
 } from '@/lib/db/supabaseUsers';
 import { sendUserCredentialsWelcomeEmail } from '@/lib/email/mailer';
+import { requireAdmin, requireSuperAdmin } from '@/lib/auth/requireSession';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const users = await fetchUsersFromSupabase();
 
     const counts = {
@@ -38,6 +42,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const body = await request.json();
     const { fullName, email, phone, password } = body;
 
@@ -85,6 +92,9 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const body = await request.json();
     const { action, id } = body;
 
@@ -105,6 +115,10 @@ export async function PATCH(request: Request) {
     }
 
     if (action === 'CHANGE_ROLE') {
+      // Changing user roles strictly requires Superadmin privilege
+      const superAuth = await requireSuperAdmin(request);
+      if (superAuth.errorResponse) return superAuth.errorResponse;
+
       const { role } = body;
       if (role !== 'ADMIN' && role !== 'TEACHER') {
         return NextResponse.json({ success: false, error: 'Role must be ADMIN or TEACHER' }, { status: 400 });
@@ -139,6 +153,10 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    // User deletion is a critical destructive action strictly requiring Superadmin
+    const auth = await requireSuperAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 

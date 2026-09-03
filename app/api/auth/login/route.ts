@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyPassword, hashPassword } from '@/lib/security/password';
+import { setConsoleSessionCookie } from '@/lib/auth/consoleSession';
+import { checkRateLimit, getClientIp } from '@/lib/security/rateLimit';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -12,6 +14,18 @@ const getHeaders = () => ({
 
 export async function POST(request: Request) {
   try {
+    const ip = getClientIp(request);
+    const rateLimit = checkRateLimit(`login:${ip}`, 10, 15 * 60 * 1000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Too many login attempts. Please try again in ${rateLimit.resetInSeconds} seconds.`,
+        },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { email, password } = body;
 
@@ -118,18 +132,14 @@ export async function POST(request: Request) {
       },
     });
 
-    // Set cookie for session isolation across browser profiles / tabs
-    res.cookies.set('isp_console_uid', user.id, {
-      path: '/',
-      httpOnly: false,
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7,
-    });
-    res.cookies.set('isp_console_role', user.role, {
-      path: '/',
-      httpOnly: false,
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7,
+    // Set signed, HttpOnly session cookie
+    setConsoleSessionCookie(res, {
+      uid: user.id,
+      email: user.email,
+      fullName: user.full_name,
+      role: user.role,
+      designation,
+      employeeId: employeeId || undefined,
     });
 
     return res;

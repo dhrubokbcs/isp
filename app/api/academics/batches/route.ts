@@ -5,9 +5,13 @@ import {
   updateBatchInSupabase,
   deleteBatchInSupabase,
 } from '@/lib/db/supabaseAcademics';
+import { requireAdmin, requireUser } from '@/lib/auth/requireSession';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const auth = await requireUser(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const batches = await fetchBatchesFromSupabase();
     return NextResponse.json({
       success: true,
@@ -22,6 +26,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const body = await request.json();
     const { name, code, academicYearId, programId, maxCapacity, shift } = body;
     if (!name || !code || !academicYearId) {
@@ -46,6 +53,9 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const body = await request.json();
     const { id, action, ...updates } = body;
 
@@ -72,6 +82,9 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 

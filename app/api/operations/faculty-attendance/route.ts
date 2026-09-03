@@ -5,9 +5,13 @@ import {
   updateFacultyAttendanceRecord,
   deleteFacultyAttendanceRecord,
 } from '@/lib/db/supabaseFacultyAttendance';
+import { requireAdmin, requireTeacherOrAdmin } from '@/lib/auth/requireSession';
 
 export async function GET(request: Request) {
   try {
+    const auth = await requireTeacherOrAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date') || undefined;
     const startDate = searchParams.get('startDate') || undefined;
@@ -44,6 +48,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const body = await request.json();
     if (!body.batchName || !body.facultyName || !body.slotStart || !body.slotEnd) {
       return NextResponse.json(
@@ -76,6 +83,9 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const body = await request.json();
     if (!body.id) {
       return NextResponse.json({ success: false, error: 'Record ID is required.' }, { status: 400 });
@@ -105,6 +115,9 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     if (!id) {

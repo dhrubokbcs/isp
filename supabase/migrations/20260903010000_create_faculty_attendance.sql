@@ -29,15 +29,8 @@ CREATE INDEX IF NOT EXISTS idx_faculty_attendance_faculty ON public.faculty_atte
 CREATE INDEX IF NOT EXISTS idx_faculty_attendance_batch ON public.faculty_attendance(batch_name);
 CREATE INDEX IF NOT EXISTS idx_faculty_attendance_status ON public.faculty_attendance(status);
 
--- Enable RLS
+-- Enable RLS and restrict anon writes
 ALTER TABLE public.faculty_attendance ENABLE ROW LEVEL SECURITY;
 
-DO $$ BEGIN
-    DROP POLICY IF EXISTS "Allow all access to faculty_attendance" ON public.faculty_attendance;
-    CREATE POLICY "Allow all access to faculty_attendance"
-        ON public.faculty_attendance
-        FOR ALL
-        TO authenticated, anon, service_role
-        USING (true)
-        WITH CHECK (true);
-END $$;
+GRANT ALL ON TABLE public.faculty_attendance TO postgres, service_role;
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.faculty_attendance FROM anon;

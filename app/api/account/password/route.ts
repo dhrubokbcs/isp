@@ -1,36 +1,58 @@
 import { NextResponse } from 'next/server';
 import { verifyPassword, hashPassword } from '@/lib/security/password';
+import { requireUser } from '@/lib/auth/requireSession';
+import { checkRateLimit, getClientIp } from '@/lib/security/rateLimit';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-const getHeaders = () => ({
-  apikey: SUPABASE_SERVICE_ROLE_KEY,
-  Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-  'Content-Type': 'application/json',
-});
+const getHeaders = () => {
+  if (!SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Server configuration error: SUPABASE_SERVICE_ROLE_KEY is required.');
+  }
+  return {
+    apikey: SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    'Content-Type': 'application/json',
+  };
+};
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireUser(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
+    const ip = getClientIp(request);
+    const rateLimit = checkRateLimit(`pwd_change:${auth.user.id}:${ip}`, 5, 15 * 60 * 1000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Too many password change attempts. Please try again in ${rateLimit.resetInSeconds} seconds.`,
+        },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
-    const { userId, currentPassword, newPassword } = body;
+    const { currentPassword, newPassword } = body;
 
-    if (!userId || !currentPassword || !newPassword) {
+    if (!currentPassword || !newPassword) {
       return NextResponse.json(
-        { success: false, error: 'User ID, current password, and new password are required.' },
+        { success: false, error: 'Current password and new password are required.' },
         { status: 400 }
       );
     }
 
-    if (newPassword.length < 6) {
+    if (newPassword.length < 8) {
       return NextResponse.json(
-        { success: false, error: 'New password must be at least 6 characters long.' },
+        { success: false, error: 'New password must be at least 8 characters long.' },
         { status: 400 }
       );
     }
 
-    // 1. Fetch user from Supabase
-    const userRes = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}&select=*`, {
+    // 1. Fetch authenticated user from Supabase
+    const userRes = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${auth.user.id}&select=*`, {
       headers: getHeaders(),
     });
 
@@ -68,7 +90,7 @@ export async function POST(request: Request) {
     updatedMeta.lastPasswordReset = new Date().toISOString();
 
     // 4. Update Supabase
-    const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}`, {
+    const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${auth.user.id}`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify({

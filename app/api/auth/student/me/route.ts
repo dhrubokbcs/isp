@@ -1,20 +1,14 @@
 import { NextResponse } from 'next/server';
-import { getStudentSession } from '@/lib/auth/studentSession';
+import { requireStudent } from '@/lib/auth/requireSession';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const student = await getStudentSession();
-
-    if (!student) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized: No active student session.' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireStudent(request);
+    if (auth.errorResponse) return auth.errorResponse;
 
     return NextResponse.json({
       success: true,
-      student,
+      student: auth.user,
     });
   } catch (err: any) {
     console.error('Error fetching student session:', err);

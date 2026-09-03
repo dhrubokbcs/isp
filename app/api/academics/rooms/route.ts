@@ -5,9 +5,13 @@ import {
   updateRoomInSupabase,
   deleteRoomInSupabase,
 } from '@/lib/db/supabaseAcademics';
+import { requireAdmin, requireUser } from '@/lib/auth/requireSession';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const auth = await requireUser(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const rooms = await fetchRoomsFromSupabase();
     return NextResponse.json({
       success: true,
@@ -22,6 +26,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const body = await request.json();
     const { roomNumber, name, roomType, capacity, floor, status } = body;
     if (!roomNumber) {
@@ -45,6 +52,9 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const body = await request.json();
     const { id, action, ...updates } = body;
 
@@ -71,6 +81,9 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 

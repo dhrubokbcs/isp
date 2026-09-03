@@ -34,18 +34,11 @@ CREATE INDEX IF NOT EXISTS idx_exams_batch ON public.exams(batch_name);
 CREATE INDEX IF NOT EXISTS idx_exams_code ON public.exams(code);
 CREATE INDEX IF NOT EXISTS idx_exams_status ON public.exams(status);
 
--- Enable Row Level Security (RLS)
+-- Enable Row Level Security (RLS) and restrict anon writes
 ALTER TABLE public.exams ENABLE ROW LEVEL SECURITY;
 
-DO $$ BEGIN
-    DROP POLICY IF EXISTS "Allow all access to exams" ON public.exams;
-    CREATE POLICY "Allow all access to exams"
-        ON public.exams
-        FOR ALL
-        TO authenticated, anon, service_role
-        USING (true)
-        WITH CHECK (true);
-END $$;
+GRANT ALL ON TABLE public.exams TO postgres, service_role;
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.exams FROM anon;
 
 -- Seed Initial Institutional Exams for testing
 INSERT INTO public.exams (
