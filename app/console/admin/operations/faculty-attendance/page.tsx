@@ -230,28 +230,31 @@ export default function FacultyAndStaffAttendancePage() {
   const todayLiveSessions = React.useMemo(() => {
     const dayRoutine = timetableRoutine.filter((s) => s.dayOfWeek?.toUpperCase() === todayWeekday);
 
-    if (dayRoutine.length === 0 && todayRecords.length === 0) {
-      return [];
-    }
+    const matchedLogIds = new Set<string>();
 
-    // Map routine sessions with real-time check-in logs
-    return dayRoutine.map((session) => {
+    // 1. Map routine sessions with real-time check-in logs
+    const routineMapped = dayRoutine.map((session) => {
       const matchLog = todayRecords.find(
         (log) =>
-          log.batchName?.toLowerCase() === session.batchName?.toLowerCase() &&
-          (log.facultyName?.toLowerCase() === session.teacherName?.toLowerCase() ||
-            session.teacherName?.toLowerCase().includes(log.facultyName?.toLowerCase()) ||
-            log.facultyName?.toLowerCase().includes(session.teacherName?.toLowerCase()))
+          !matchedLogIds.has(log.id) &&
+          log.batchName?.trim().toLowerCase() === session.batchName?.trim().toLowerCase() &&
+          (log.facultyName?.trim().toLowerCase() === session.teacherName?.trim().toLowerCase() ||
+            session.teacherName?.toLowerCase().includes(log.facultyName?.trim().toLowerCase()) ||
+            log.facultyName?.toLowerCase().includes(session.teacherName?.trim().toLowerCase()))
       );
+
+      if (matchLog) {
+        matchedLogIds.add(matchLog.id);
+      }
 
       return {
         id: matchLog?.id || session.id,
         isFromLog: Boolean(matchLog),
         batchName: session.batchName,
-        subjectName: session.subject,
+        subjectName: session.subject || 'Academic Session',
         facultyName: matchLog?.facultyName || session.teacherName,
         substituteFacultyName: matchLog?.substituteFacultyName || null,
-        roomNumber: session.roomNumber,
+        roomNumber: session.roomNumber || 'Room 101',
         slotStart: session.startTime,
         slotEnd: session.endTime,
         entryTime: matchLog?.entryTime || null,
@@ -262,6 +265,29 @@ export default function FacultyAndStaffAttendancePage() {
         rawLog: matchLog,
       };
     });
+
+    // 2. Append all other today attendance records (QR punches, ad-hoc sessions, manual check-ins)
+    const adHocSessions = todayRecords
+      .filter((log) => !matchedLogIds.has(log.id))
+      .map((log) => ({
+        id: log.id,
+        isFromLog: true,
+        batchName: log.batchName || 'Campus Session',
+        subjectName: log.subjectName || (log.batchName?.includes('Campus') ? 'Campus Attendance' : 'Academic Class'),
+        facultyName: log.facultyName,
+        substituteFacultyName: log.substituteFacultyName || null,
+        roomNumber: log.roomName || 'Frontdesk / Campus',
+        slotStart: log.slotStart || '08:00 AM',
+        slotEnd: log.slotEnd || '08:00 PM',
+        entryTime: log.entryTime || null,
+        exitTime: log.exitTime || null,
+        duration: log.duration || null,
+        totalStudents: log.totalStudents || 0,
+        status: log.status || 'PRESENT',
+        rawLog: log,
+      }));
+
+    return [...routineMapped, ...adHocSessions];
   }, [timetableRoutine, todayWeekday, todayRecords]);
 
   // Toggle Self Attendance Setting
