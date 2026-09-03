@@ -62,6 +62,7 @@ export default function MyAccountSettingsPage() {
   // 1. Profile State
   const [fullName, setFullName] = React.useState('');
   const [nickname, setNickname] = React.useState('');
+  const [designation, setDesignation] = React.useState('');
   const [birthday, setBirthday] = React.useState('');
   const [gender, setGender] = React.useState('Male');
   const [bio, setBio] = React.useState('');
@@ -120,7 +121,24 @@ export default function MyAccountSettingsPage() {
   const loadAccount = React.useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/account');
+      let query = '';
+      if (typeof window !== 'undefined') {
+        const storedUser = localStorage.getItem('isp_console_user');
+        const storedRole = localStorage.getItem('isp_console_role');
+        if (storedUser) {
+          try {
+            const parsed = JSON.parse(storedUser);
+            if (parsed.id) query = `?userId=${parsed.id}`;
+          } catch {
+            // ignore
+          }
+        }
+        if (!query && storedRole) {
+          query = `?role=${storedRole}`;
+        }
+      }
+
+      const res = await fetch(`/api/account${query}`);
       const data = await res.json();
       if (!res.ok || !data.success || !data.account) {
         throw new Error(data.error || 'Failed to load user account');
@@ -132,6 +150,7 @@ export default function MyAccountSettingsPage() {
       // Populate Profile
       setFullName(acc.fullName || '');
       setNickname(acc.nickname || '');
+      setDesignation(acc.designation || '');
       setBirthday(acc.birthday || '');
       setGender(acc.gender || 'Male');
       setBio(acc.bio || '');

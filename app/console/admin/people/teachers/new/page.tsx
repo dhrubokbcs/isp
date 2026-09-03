@@ -47,6 +47,7 @@ export default function AddTeacherPage() {
   // Form Fields
   const [fullName, setFullName] = React.useState('');
   const [nickname, setNickname] = React.useState('');
+  const [designation, setDesignation] = React.useState('Senior Faculty');
   const [dob, setDob] = React.useState('');
   const [gender, setGender] = React.useState<'Male' | 'Female' | 'Other'>('Male');
   const [bio, setBio] = React.useState('');
@@ -122,6 +123,7 @@ export default function AddTeacherPage() {
         body: JSON.stringify({
           fullName,
           nickname,
+          designation,
           dob,
           gender,
           bio,
@@ -200,7 +202,7 @@ export default function AddTeacherPage() {
                   </Typography>
 
                   <Grid container spacing={2.5}>
-                    <Grid size={{ xs: 12, sm: 8 }}>
+                    <Grid size={{ xs: 12, sm: 6 }}>
                       <TextField
                         fullWidth
                         required
@@ -211,13 +213,23 @@ export default function AddTeacherPage() {
                       />
                     </Grid>
 
-                    <Grid size={{ xs: 12, sm: 4 }}>
+                    <Grid size={{ xs: 12, sm: 3 }}>
                       <TextField
                         fullWidth
                         label="Nickname"
                         placeholder="e.g. Nayan"
                         value={nickname}
                         onChange={(e) => setNickname(e.target.value)}
+                      />
+                    </Grid>
+
+                    <Grid size={{ xs: 12, sm: 3 }}>
+                      <TextField
+                        fullWidth
+                        label="Designation / Title"
+                        placeholder="e.g. Senior Faculty"
+                        value={designation}
+                        onChange={(e) => setDesignation(e.target.value)}
                       />
                     </Grid>
 

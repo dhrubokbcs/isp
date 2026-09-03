@@ -23,7 +23,10 @@ import {
   useMediaQuery,
   useTheme,
   Tooltip,
+  Stack,
+  Link as MuiLink,
 } from '@mui/material';
+import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
 import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
 import SchoolRoundedIcon from '@mui/icons-material/SchoolRounded';
@@ -43,6 +46,8 @@ import ManageAccountsRoundedIcon from '@mui/icons-material/ManageAccountsRounded
 import SecurityRoundedIcon from '@mui/icons-material/SecurityRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded';
+import BadgeRoundedIcon from '@mui/icons-material/BadgeRounded';
+import CoPresentRoundedIcon from '@mui/icons-material/CoPresentRounded';
 import { ispColors } from '@/theme/colors';
 
 const DRAWER_WIDTH = 270;
@@ -60,7 +65,28 @@ interface NavSection {
   items: NavItem[];
 }
 
-const navSections: NavSection[] = [
+// 1. Dedicated Teacher Navigation (Dashboard & Settings Only)
+const teacherNavSections: NavSection[] = [
+  {
+    items: [
+      {
+        label: 'Dashboard',
+        href: '/teacher/dashboard',
+        icon: <DashboardRoundedIcon fontSize="small" />,
+        roles: ['TEACHER'],
+      },
+      {
+        label: 'Settings',
+        href: '/teacher/settings',
+        icon: <SettingsRoundedIcon fontSize="small" />,
+        roles: ['TEACHER'],
+      },
+    ],
+  },
+];
+
+// 2. Admin & Management Navigation Sections
+const adminNavSections: NavSection[] = [
   {
     items: [
       {
@@ -68,12 +94,6 @@ const navSections: NavSection[] = [
         href: '/admin/dashboard',
         icon: <DashboardRoundedIcon fontSize="small" />,
         roles: ['SUPERADMIN', 'ADMIN'],
-      },
-      {
-        label: 'Teacher Portal',
-        href: '/teacher/dashboard',
-        icon: <SchoolRoundedIcon fontSize="small" />,
-        roles: ['TEACHER'],
       },
     ],
   },
@@ -120,7 +140,7 @@ const navSections: NavSection[] = [
         label: 'Timetable',
         href: '/admin/academics/timetable',
         icon: <AccessTimeRoundedIcon fontSize="small" />,
-        roles: ['SUPERADMIN', 'ADMIN', 'TEACHER'],
+        roles: ['SUPERADMIN', 'ADMIN'],
       },
     ],
   },
@@ -137,7 +157,7 @@ const navSections: NavSection[] = [
         label: 'Students',
         href: '/admin/people/students',
         icon: <PeopleAltRoundedIcon fontSize="small" />,
-        roles: ['SUPERADMIN', 'ADMIN', 'TEACHER'],
+        roles: ['SUPERADMIN', 'ADMIN'],
       },
       {
         label: 'Teachers',
@@ -157,16 +177,22 @@ const navSections: NavSection[] = [
     title: 'ACADEMIC OPERATIONS',
     items: [
       {
+        label: 'Faculty Attendance',
+        href: '/admin/operations/faculty-attendance',
+        icon: <CoPresentRoundedIcon fontSize="small" />,
+        roles: ['SUPERADMIN', 'ADMIN'],
+      },
+      {
+        label: 'Student Attendance',
+        href: '/admin/operations/attendance',
+        icon: <HowToRegRoundedIcon fontSize="small" />,
+        roles: ['SUPERADMIN', 'ADMIN'],
+      },
+      {
         label: 'Class Sessions',
         href: '/admin/operations/sessions',
         icon: <CalendarMonthRoundedIcon fontSize="small" />,
-        roles: ['SUPERADMIN', 'ADMIN', 'TEACHER'],
-      },
-      {
-        label: 'Attendance',
-        href: '/admin/operations/attendance',
-        icon: <HowToRegRoundedIcon fontSize="small" />,
-        roles: ['SUPERADMIN', 'ADMIN', 'TEACHER'],
+        roles: ['SUPERADMIN', 'ADMIN'],
       },
     ],
   },
@@ -177,13 +203,13 @@ const navSections: NavSection[] = [
         label: 'Exams & Schedules',
         href: '/admin/examination/exams',
         icon: <AssignmentRoundedIcon fontSize="small" />,
-        roles: ['SUPERADMIN', 'ADMIN', 'TEACHER'],
+        roles: ['SUPERADMIN', 'ADMIN'],
       },
       {
         label: 'Marks & Results',
         href: '/admin/examination/results',
         icon: <AssignmentRoundedIcon fontSize="small" />,
-        roles: ['SUPERADMIN', 'ADMIN', 'TEACHER'],
+        roles: ['SUPERADMIN', 'ADMIN'],
       },
     ],
   },
@@ -217,7 +243,7 @@ const navSections: NavSection[] = [
         label: 'Notices',
         href: '/admin/communication/notices',
         icon: <CampaignRoundedIcon fontSize="small" />,
-        roles: ['SUPERADMIN', 'ADMIN', 'TEACHER'],
+        roles: ['SUPERADMIN', 'ADMIN'],
       },
     ],
   },
@@ -248,16 +274,23 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
 
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [userRole, setUserRole] = React.useState<'SUPERADMIN' | 'ADMIN' | 'TEACHER'>('ADMIN');
-  const [userName, setUserName] = React.useState('ISP Administrator');
+  const [userName, setUserName] = React.useState('ISP User');
+  const [userDesignation, setUserDesignation] = React.useState('Faculty Member');
+  const [userEmployeeId, setUserEmployeeId] = React.useState('');
+  const [userEmail, setUserEmail] = React.useState('');
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
 
-  // Live sync user name and role from database and localStorage
+  // Check if currently on Teacher Portal routes
+  const isTeacherPortal = userRole === 'TEACHER' || pathname.startsWith('/teacher') || pathname.startsWith('/console/teacher');
+
+  // Live sync user name, role, designation, and employee ID
   React.useEffect(() => {
     const fetchLiveAccount = async () => {
       try {
         let query = '';
         if (typeof window !== 'undefined') {
           const storedUser = localStorage.getItem('isp_console_user');
+          const storedRole = localStorage.getItem('isp_console_role');
           if (storedUser) {
             try {
               const parsed = JSON.parse(storedUser);
@@ -265,6 +298,11 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
             } catch {
               // ignore
             }
+          }
+          if (!query && storedRole) {
+            query = `?role=${storedRole}`;
+          } else if (!query && (pathname.startsWith('/teacher') || pathname.startsWith('/console/teacher'))) {
+            query = '?role=TEACHER';
           }
         }
 
@@ -285,6 +323,8 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
                   name: acc.fullName,
                   email: acc.email,
                   role: acc.role,
+                  designation: acc.designation,
+                  employeeId: acc.employeeId,
                 })
               );
             }
@@ -295,6 +335,9 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
               localStorage.setItem('isp_console_role', acc.role);
             }
           }
+          if (acc.designation) setUserDesignation(acc.designation);
+          if (acc.employeeId) setUserEmployeeId(acc.employeeId);
+          if (acc.email) setUserEmail(acc.email);
         }
       } catch (err) {
         console.warn('Could not sync live user account in header:', err);
@@ -311,6 +354,10 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
         try {
           const parsed = JSON.parse(storedUser);
           if (parsed.name) setUserName(parsed.name);
+          if (parsed.role) setUserRole(parsed.role);
+          if (parsed.designation) setUserDesignation(parsed.designation);
+          if (parsed.employeeId) setUserEmployeeId(parsed.employeeId);
+          if (parsed.email) setUserEmail(parsed.email);
         } catch {
           // ignore
         }
@@ -319,15 +366,6 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
 
     // 2. Fetch live data from Supabase DB
     fetchLiveAccount();
-
-    // 3. Listen for immediate profile updates from other pages
-    const handleProfileUpdate = () => {
-      fetchLiveAccount();
-    };
-    window.addEventListener('isp_user_profile_updated', handleProfileUpdate);
-    return () => {
-      window.removeEventListener('isp_user_profile_updated', handleProfileUpdate);
-    };
   }, []);
 
   const handleDrawerToggle = () => {
@@ -342,6 +380,9 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
     setAnchorEl(null);
     router.push('/login');
   };
+
+  // Determine active nav sections: Dedicated Teacher Nav vs Admin Nav
+  const activeSections = isTeacherPortal ? teacherNavSections : adminNavSections;
 
   const drawerContent = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -364,8 +405,8 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
             width: 38,
             height: 38,
             borderRadius: '9px',
-            bgcolor: ispColors.primary[500],
-            color: '#FFFFFF',
+            bgcolor: isTeacherPortal ? '#061B57' : ispColors.primary[500],
+            color: isTeacherPortal ? '#FFD21F' : '#FFFFFF',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -377,20 +418,17 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
         </Box>
         <Box>
           <Typography variant="body1" sx={{ fontWeight: 700, lineHeight: 1.2, color: 'text.primary', fontSize: '15px' }}>
-            ISP Console
+            {isTeacherPortal ? 'Teacher Portal' : 'ISP Console'}
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '12px' }}>
-            Faculty &amp; Management
+            {isTeacherPortal ? 'Faculty Workspace' : 'Management & Ops'}
           </Typography>
         </Box>
       </Box>
 
-
-
       {/* Navigation Sections */}
       <Box sx={{ flexGrow: 1, overflowY: 'auto', px: 1.5, py: 2 }}>
-        {navSections.map((section, sIdx) => {
-          // Filter items based on active role
+        {activeSections.map((section, sIdx) => {
           const visibleItems = section.items.filter((item) => item.roles.includes(userRole));
           if (visibleItems.length === 0) return null;
 
@@ -426,24 +464,24 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
                           py: 1,
                           px: 1.5,
                           minHeight: '40px',
-                          bgcolor: isActive ? ispColors.primary[50] : 'transparent',
-                          color: isActive ? ispColors.primary[700] : ispColors.text.primary,
+                          bgcolor: isActive ? (isTeacherPortal ? '#EEF4FF' : ispColors.primary[50]) : 'transparent',
+                          color: isActive ? '#1748D1' : ispColors.text.primary,
                           '&:hover': {
-                            bgcolor: isActive ? ispColors.primary[50] : ispColors.background.default,
+                            bgcolor: isActive ? '#EEF4FF' : ispColors.background.default,
                           },
                         }}
                       >
                         <ListItemIcon
                           sx={{
                             minWidth: 32,
-                            color: isActive ? ispColors.primary[600] : ispColors.text.secondary,
+                            color: isActive ? '#1748D1' : ispColors.text.secondary,
                           }}
                         >
                           {item.icon}
                         </ListItemIcon>
                         <ListItemText
                           primary={
-                            <Typography sx={{ fontSize: '14px', fontWeight: isActive ? 600 : 500 }}>
+                            <Typography sx={{ fontSize: '14px', fontWeight: isActive ? 700 : 500 }}>
                               {item.label}
                             </Typography>
                           }
@@ -461,15 +499,15 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
       {/* Bottom Profile Summary & Logout */}
       <Box sx={{ p: 2, borderTop: `1px solid ${ispColors.border.default}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, overflow: 'hidden' }}>
-          <Avatar sx={{ width: 34, height: 34, bgcolor: ispColors.primary[500], fontSize: '14px', fontWeight: 600 }}>
+          <Avatar sx={{ width: 34, height: 34, bgcolor: isTeacherPortal ? '#061B57' : ispColors.primary[500], color: isTeacherPortal ? '#FFD21F' : '#FFFFFF', fontSize: '14px', fontWeight: 700 }}>
             {userName.charAt(0)}
           </Avatar>
           <Box sx={{ overflow: 'hidden' }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '13px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+            <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '13px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
               {userName}
             </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '11px' }}>
-              {userRole}
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '11px', display: 'block' }}>
+              {isTeacherPortal ? (userEmployeeId || 'Faculty Member') : userRole}
             </Typography>
           </Box>
         </Box>
@@ -495,8 +533,6 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
           borderBottom: `1px solid ${ispColors.border.default}`,
           boxShadow: 'none',
           height: HEADER_HEIGHT,
-          minHeight: `${HEADER_HEIGHT}px`,
-          maxHeight: `${HEADER_HEIGHT}px`,
           boxSizing: 'border-box',
           justifyContent: 'center',
         }}
@@ -520,8 +556,8 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
             >
               <MenuRoundedIcon />
             </IconButton>
-            <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '18px', color: 'text.primary' }}>
-              Indicator Student&apos;s Point
+            <Typography variant="h6" sx={{ fontWeight: 800, fontSize: '18px', color: '#061B57' }}>
+              {isTeacherPortal ? 'Teacher Portal' : 'Indicator Student\'s Point'}
             </Typography>
           </Box>
 
@@ -532,12 +568,24 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
               </IconButton>
             </Tooltip>
 
+            {/* Top Nav Avatar Button */}
             <IconButton size="small" onClick={(e) => setAnchorEl(e.currentTarget)}>
-              <Avatar sx={{ width: 34, height: 34, bgcolor: ispColors.primary[600], fontSize: '14px', fontWeight: 600 }}>
+              <Avatar
+                sx={{
+                  width: 36,
+                  height: 36,
+                  bgcolor: isTeacherPortal ? '#061B57' : ispColors.primary[600],
+                  color: isTeacherPortal ? '#FFD21F' : '#FFFFFF',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  border: isTeacherPortal ? '2px solid rgba(255, 210, 31, 0.4)' : 'none',
+                }}
+              >
                 {userName.charAt(0)}
               </Avatar>
             </IconButton>
 
+            {/* Top Nav Avatar Dropdown Menu (Configured for Teacher Account) */}
             <Menu
               anchorEl={anchorEl}
               open={Boolean(anchorEl)}
@@ -546,22 +594,35 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
               anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
               slotProps={{
                 paper: {
-                  sx: { width: 250, mt: 1, p: 0.5, borderRadius: '12px' },
+                  sx: { width: 280, mt: 1, p: 0.8, borderRadius: '14px', boxShadow: '0 10px 30px rgba(0,0,0,0.12)' },
                 },
               }}
             >
-              {/* First Row: Avatar at left, in right name, after name user role badge */}
-              <Box sx={{ px: 1.5, py: 1.2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Avatar sx={{ width: 40, height: 40, bgcolor: ispColors.primary[600], fontSize: '16px', fontWeight: 700 }}>
+              {/* Header: Teacher Avatar, Full Name, Designation & Badges */}
+              <Box sx={{ px: 1.5, py: 1.2, display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+                <Avatar
+                  sx={{
+                    width: 44,
+                    height: 44,
+                    bgcolor: isTeacherPortal ? '#061B57' : ispColors.primary[600],
+                    color: isTeacherPortal ? '#FFD21F' : '#FFFFFF',
+                    fontSize: '18px',
+                    fontWeight: 800,
+                    mt: 0.2,
+                  }}
+                >
                   {userName.charAt(0)}
                 </Avatar>
                 <Box sx={{ minWidth: 0, flex: 1 }}>
-                  <Typography variant="body2" noWrap sx={{ fontWeight: 700, color: '#061B57', lineHeight: 1.3 }}>
+                  <Typography variant="body2" noWrap sx={{ fontWeight: 800, color: '#061B57', fontSize: '14.5px', lineHeight: 1.2 }}>
                     {userName}
                   </Typography>
-                  <Box sx={{ mt: 0.4 }}>
+                  <Typography variant="caption" noWrap sx={{ color: '#64748B', fontSize: '12px', display: 'block', mt: 0.2 }}>
+                    {isTeacherPortal ? userDesignation : (userEmail || 'Administrator')}
+                  </Typography>
+                  <Stack direction="row" spacing={0.6} sx={{ mt: 0.8 }}>
                     <Chip
-                      label={userRole}
+                      label={isTeacherPortal ? 'FACULTY' : userRole}
                       size="small"
                       sx={{
                         height: 20,
@@ -574,16 +635,31 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
                         letterSpacing: '0.5px',
                       }}
                     />
-                  </Box>
+                    {isTeacherPortal && userEmployeeId && (
+                      <Chip
+                        icon={<BadgeRoundedIcon sx={{ fontSize: '12px !important', color: '#061B57 !important' }} />}
+                        label={userEmployeeId}
+                        size="small"
+                        sx={{
+                          height: 20,
+                          fontSize: '10px',
+                          fontWeight: 800,
+                          bgcolor: '#FFD21F',
+                          color: '#061B57',
+                          borderRadius: '4px',
+                        }}
+                      />
+                    )}
+                  </Stack>
                 </Box>
               </Box>
 
-              <Divider sx={{ my: 0.8 }} />
+              <Divider sx={{ my: 1 }} />
 
               {/* Menu Item 1: Dashboard */}
               <MenuItem
                 component={Link}
-                href={userRole === 'TEACHER' ? '/teacher/dashboard' : '/admin/dashboard'}
+                href={isTeacherPortal ? '/teacher/dashboard' : '/admin/dashboard'}
                 onClick={() => setAnchorEl(null)}
                 sx={{ fontWeight: 600, fontSize: '13.5px', py: 1, borderRadius: '8px' }}
               >
@@ -596,7 +672,7 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
               {/* Menu Item 2: Account & Security */}
               <MenuItem
                 component={Link}
-                href="/admin/account"
+                href={isTeacherPortal ? '/teacher/settings' : '/admin/account'}
                 onClick={() => setAnchorEl(null)}
                 sx={{ fontWeight: 600, fontSize: '13.5px', py: 1, borderRadius: '8px' }}
               >
@@ -606,7 +682,7 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
                 Account &amp; Security
               </MenuItem>
 
-              <Divider sx={{ my: 0.8 }} />
+              <Divider sx={{ my: 1 }} />
 
               {/* Menu Item 3: Logout */}
               <MenuItem onClick={handleLogout} sx={{ color: 'error.main', fontWeight: 600, fontSize: '13.5px', py: 1, borderRadius: '8px' }}>
@@ -665,13 +741,70 @@ export default function ConsoleAppShell({ children }: { children: React.ReactNod
         component="main"
         sx={{
           flexGrow: 1,
-          p: { xs: 2.5, sm: 4 },
+          display: 'flex',
+          flexDirection: 'column',
           width: { lg: `calc(100% - ${DRAWER_WIDTH}px)` },
           mt: `${HEADER_HEIGHT}px`,
           minHeight: `calc(100vh - ${HEADER_HEIGHT}px)`,
         }}
       >
-        {children}
+        <Box sx={{ flexGrow: 1, p: { xs: 2.5, sm: 4 } }}>
+          {children}
+        </Box>
+
+        {/* Small Height Console Footer */}
+        <Box
+          component="footer"
+          sx={{
+            py: 1.5,
+            px: { xs: 2.5, sm: 4 },
+            borderTop: `1px solid ${ispColors.border.default}`,
+            bgcolor: '#FFFFFF',
+            display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 1,
+          }}
+        >
+          <Typography
+            variant="caption"
+            sx={{
+              color: 'text.secondary',
+              fontWeight: 500,
+              fontSize: '12.5px',
+            }}
+          >
+            A product of OGIT
+          </Typography>
+
+          <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500, fontSize: '12.5px' }}>
+              Built with
+            </Typography>
+            <FavoriteRoundedIcon sx={{ fontSize: 13, color: '#EF4444', mx: 0.2 }} />
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500, fontSize: '12.5px' }}>
+              by
+            </Typography>
+            <MuiLink
+              href="https://web.sadi.com.bd"
+              target="_blank"
+              rel="noopener noreferrer"
+              underline="none"
+              sx={{
+                color: 'text.secondary',
+                fontWeight: 600,
+                fontSize: '12.5px',
+                transition: 'color 0.2s',
+                '&:hover': {
+                  color: ispColors.primary[600],
+                },
+              }}
+            >
+              Sadi Jubair
+            </MuiLink>
+          </Stack>
+        </Box>
       </Box>
     </Box>
   );

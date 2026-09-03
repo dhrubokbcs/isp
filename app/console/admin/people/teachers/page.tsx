@@ -5,7 +5,6 @@ import Link from 'next/link';
 import {
   Box,
   Card,
-  CardContent,
   Button,
   TextField,
   InputAdornment,
@@ -32,28 +31,28 @@ import {
   Grid,
   Stack,
   Alert,
-  Snackbar,
+  CircularProgress,
 } from '@mui/material';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import PersonAddRoundedIcon from '@mui/icons-material/PersonAddRounded';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
+import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
+import KeyRoundedIcon from '@mui/icons-material/KeyRounded';
 import PhoneRoundedIcon from '@mui/icons-material/PhoneRounded';
 import EmailRoundedIcon from '@mui/icons-material/EmailRounded';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
-import KeyRoundedIcon from '@mui/icons-material/KeyRounded';
 import SchoolRoundedIcon from '@mui/icons-material/SchoolRounded';
-import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 
 import PageHeader from '@/components/common/PageHeader';
 import StatusChip from '@/components/common/StatusChip';
 import { useToast } from '@/components/common/ToastProvider';
 import { ispColors } from '@/theme/colors';
-import { Teacher, INITIAL_TEACHERS } from '@/lib/db/teachers';
+import { Teacher } from '@/lib/db/teachers';
 
 export default function TeachersPage() {
-  const { success, info } = useToast();
+  const { success, error: toastError, info } = useToast();
   const [teachers, setTeachers] = React.useState<Teacher[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState('');
@@ -63,8 +62,25 @@ export default function TeachersPage() {
   // Modal view for a specific teacher
   const [selectedTeacher, setSelectedTeacher] = React.useState<Teacher | null>(null);
 
-  // Fetch live teachers from API on mount
-  React.useEffect(() => {
+  // Edit Teacher Modal State
+  const [editingTeacher, setEditingTeacher] = React.useState<Teacher | null>(null);
+  const [editFullName, setEditFullName] = React.useState('');
+  const [editNickname, setEditNickname] = React.useState('');
+  const [editDesignation, setEditDesignation] = React.useState('');
+  const [editEducationalDetails, setEditEducationalDetails] = React.useState('');
+  const [editExperience, setEditExperience] = React.useState('');
+  const [editDob, setEditDob] = React.useState('');
+  const [editMobile, setEditMobile] = React.useState('');
+  const [editWhatsapp, setEditWhatsapp] = React.useState('');
+  const [editEmail, setEditEmail] = React.useState('');
+  const [editBio, setEditBio] = React.useState('');
+  const [editGender, setEditGender] = React.useState<'Male' | 'Female' | 'Other'>('Male');
+  const [editStatus, setEditStatus] = React.useState<'ACTIVE' | 'INACTIVE'>('ACTIVE');
+  const [savingEdit, setSavingEdit] = React.useState(false);
+
+  // Fetch live teachers from API
+  const loadTeachers = React.useCallback(() => {
+    setLoading(true);
     fetch('/api/teachers')
       .then((res) => res.json())
       .then((data) => {
@@ -76,15 +92,19 @@ export default function TeachersPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  React.useEffect(() => {
+    loadTeachers();
+  }, [loadTeachers]);
+
   const filteredTeachers = React.useMemo(() => {
     return teachers.filter((t) => {
       const matchSearch =
         t.fullName.toLowerCase().includes(search.toLowerCase()) ||
-        t.nickname.toLowerCase().includes(search.toLowerCase()) ||
         t.employeeId.toLowerCase().includes(search.toLowerCase()) ||
         t.email.toLowerCase().includes(search.toLowerCase()) ||
         t.mobile.includes(search) ||
-        t.educationalDetails.toLowerCase().includes(search.toLowerCase());
+        (t.educationalDetails && t.educationalDetails.toLowerCase().includes(search.toLowerCase())) ||
+        (t.experience && t.experience.toLowerCase().includes(search.toLowerCase()));
 
       const matchStatus = statusFilter === 'ALL' || t.status === statusFilter;
       const matchGender = genderFilter === 'ALL' || t.gender === genderFilter;
@@ -93,46 +113,69 @@ export default function TeachersPage() {
     });
   }, [teachers, search, statusFilter, genderFilter]);
 
-  const handleCopyCredentials = (teacher: Teacher) => {
-    const text = `ISP Digital Campus — Teacher Login Credentials\nEmployee ID: ${teacher.employeeId}\nName: ${teacher.fullName}\nLogin Email: ${teacher.email}\nPrimary Password: ${teacher.initialPassword || '********'}\nPortal: https://console.ispctg.live/login`;
-    navigator.clipboard.writeText(text);
-    success(`Credentials copied for ${teacher.fullName} (${teacher.employeeId})`);
+  // Open Edit Modal
+  const handleOpenEditTeacher = (teacher: Teacher) => {
+    setEditingTeacher(teacher);
+    setEditFullName(teacher.fullName);
+    setEditNickname(teacher.nickname || '');
+    setEditDesignation(teacher.designation || '');
+    setEditEducationalDetails(teacher.educationalDetails || '');
+    setEditExperience(teacher.experience || '');
+    setEditDob(teacher.dob || '');
+    setEditMobile(teacher.mobile);
+    setEditWhatsapp(teacher.whatsapp || teacher.mobile);
+    setEditEmail(teacher.email);
+    setEditBio(teacher.bio || '');
+    setEditGender(teacher.gender || 'Male');
+    setEditStatus(teacher.status);
   };
 
-  const handleToggleStatus = async (employeeId: string) => {
-    let nextStatus: 'ACTIVE' | 'INACTIVE' = 'ACTIVE';
-    setTeachers((prev) =>
-      prev.map((t) => {
-        if (t.employeeId === employeeId) {
-          nextStatus = t.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-          return { ...t, status: nextStatus };
-        }
-        return t;
-      })
-    );
-    if (selectedTeacher && selectedTeacher.employeeId === employeeId) {
-      setSelectedTeacher((prev) =>
-        prev ? { ...prev, status: nextStatus } : null
-      );
-    }
-    info(`Status updated to ${nextStatus}.`);
+  // Save Edit
+  const handleSaveEditTeacher = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTeacher) return;
 
+    setSavingEdit(true);
     try {
-      await fetch('/api/teachers', {
+      const res = await fetch('/api/teachers', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ employeeId, status: nextStatus }),
+        body: JSON.stringify({
+          employeeId: editingTeacher.employeeId,
+          fullName: editFullName.trim(),
+          nickname: editNickname.trim(),
+          designation: editDesignation.trim(),
+          educationalDetails: editEducationalDetails.trim(),
+          experience: editExperience.trim(),
+          dob: editDob || undefined,
+          mobile: editMobile.trim(),
+          whatsapp: editWhatsapp.trim(),
+          email: editEmail.trim(),
+          bio: editBio.trim(),
+          gender: editGender,
+          status: editStatus,
+        }),
       });
-    } catch (e) {
-      console.error('Failed to sync status to database:', e);
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update teacher');
+      }
+
+      success(`Teacher profile for ${editFullName} updated successfully!`);
+      setEditingTeacher(null);
+      loadTeachers();
+    } catch (err: any) {
+      toastError(err.message || 'Error updating teacher profile');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
   return (
-    <Box>
+    <Box sx={{ pb: 6 }}>
       <PageHeader
         title="Teachers Directory"
-        subtitle={`Total Teachers: ${teachers.length} (Active: ${teachers.filter((t) => t.status === 'ACTIVE').length})`}
         action={
           <Button
             variant="contained"
@@ -155,7 +198,7 @@ export default function TeachersPage() {
       {/* Metrics Cards */}
       <Grid container spacing={2.5} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card sx={{ p: 2.5, borderRadius: '12px', border: `1px solid ${ispColors.border.default}` }}>
+          <Card sx={{ p: 2.5, borderRadius: '12px', border: `1px solid ${ispColors.border.default}`, boxShadow: 'none' }}>
             <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
               TOTAL TEACHERS
             </Typography>
@@ -169,7 +212,7 @@ export default function TeachersPage() {
         </Grid>
 
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card sx={{ p: 2.5, borderRadius: '12px', border: `1px solid ${ispColors.border.default}` }}>
+          <Card sx={{ p: 2.5, borderRadius: '12px', border: `1px solid ${ispColors.border.default}`, boxShadow: 'none' }}>
             <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
               ACTIVE IN SERVICE
             </Typography>
@@ -183,29 +226,29 @@ export default function TeachersPage() {
         </Grid>
 
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card sx={{ p: 2.5, borderRadius: '12px', border: `1px solid ${ispColors.border.default}` }}>
+          <Card sx={{ p: 2.5, borderRadius: '12px', border: `1px solid ${ispColors.border.default}`, boxShadow: 'none' }}>
             <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
               SENIOR MENTORS
             </Typography>
             <Typography variant="h4" sx={{ fontWeight: 800, color: '#1748D1', mt: 0.5 }}>
-              {teachers.filter((t) => t.educationalDetails.includes('CUET') || t.educationalDetails.includes('MBBS')).length}
+              {teachers.filter((t) => (t.educationalDetails || '').includes('CUET') || (t.educationalDetails || '').includes('MBBS') || (t.designation || '').toLowerCase().includes('senior')).length}
             </Typography>
             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-              CUET &amp; Medical scholars
+              Senior educators &amp; scholars
             </Typography>
           </Card>
         </Grid>
 
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card sx={{ p: 2.5, borderRadius: '12px', border: `1px solid ${ispColors.border.default}` }}>
+          <Card sx={{ p: 2.5, borderRadius: '12px', border: `1px solid ${ispColors.border.default}`, boxShadow: 'none' }}>
             <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-              NEXT EMPLOYEE ID
+              JUNIOR MENTORS
             </Typography>
             <Typography variant="h4" sx={{ fontWeight: 800, color: '#D97706', mt: 0.5 }}>
-              {`ISP${Math.max(...teachers.map((t) => parseInt(t.employeeId.replace(/\D/g, '') || '1000', 10)), 1000) + 1}`}
+              {teachers.filter((t) => (t.designation || '').toLowerCase().includes('junior') || (t.designation || '').toLowerCase().includes('lecturer') || (t.designation || '').toLowerCase().includes('associate')).length}
             </Typography>
             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-              Sequential auto-counter
+              Associate educators
             </Typography>
           </Card>
         </Grid>
@@ -259,13 +302,14 @@ export default function TeachersPage() {
                 <MenuItem value="ALL">All Genders</MenuItem>
                 <MenuItem value="Male">Male</MenuItem>
                 <MenuItem value="Female">Female</MenuItem>
+                <MenuItem value="Other">Other</MenuItem>
               </Select>
             </FormControl>
           </Grid>
         </Grid>
       </Box>
 
-      {/* Teachers Table */}
+      {/* Teachers Table Container */}
       <TableContainer
         component={Paper}
         sx={{
@@ -274,7 +318,7 @@ export default function TeachersPage() {
           boxShadow: 'none',
         }}
       >
-        <Table sx={{ minWidth: 850 }}>
+        <Table sx={{ minWidth: 750 }}>
           <TableHead sx={{ bgcolor: '#F8FAFC' }}>
             <TableRow>
               <TableCell sx={{ fontWeight: 700, fontSize: '13px' }}>Name</TableCell>
@@ -307,9 +351,9 @@ export default function TeachersPage() {
                       <Typography variant="body2" sx={{ fontWeight: 700, color: '#061B57', lineHeight: 1.3 }}>
                         {teacher.fullName}
                       </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.3 }}>
-                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '11.5px' }}>
-                          EmpID: <strong style={{ color: '#1748D1' }}>{teacher.employeeId}</strong>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.2 }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '11px' }}>
+                          EmpID: <strong style={{ color: '#061B57' }}>{teacher.employeeId}</strong>
                         </Typography>
                         <Tooltip title={`Copy Employee ID: ${teacher.employeeId}`}>
                           <IconButton
@@ -324,7 +368,7 @@ export default function TeachersPage() {
                               '&:hover': { color: '#1748D1', bgcolor: '#EEF4FF' },
                             }}
                           >
-                            <ContentCopyRoundedIcon sx={{ fontSize: 13 }} />
+                            <ContentCopyRoundedIcon sx={{ fontSize: 12 }} />
                           </IconButton>
                         </Tooltip>
                       </Box>
@@ -356,7 +400,7 @@ export default function TeachersPage() {
                 <TableCell align="right">
                   <Stack direction="row" spacing={0.5} sx={{ justifyContent: 'flex-end', alignItems: 'center' }}>
                     {teacher.whatsapp && (
-                      <Tooltip title={`Chat on WhatsApp (${teacher.whatsapp})`}>
+                      <Tooltip title={`WhatsApp: ${teacher.whatsapp}`}>
                         <IconButton
                           size="small"
                           component="a"
@@ -370,23 +414,23 @@ export default function TeachersPage() {
                       </Tooltip>
                     )}
 
-                    <Tooltip title="View Complete Profile &amp; Credentials">
+                    <Tooltip title="View Complete Profile">
                       <IconButton
                         size="small"
                         onClick={() => setSelectedTeacher(teacher)}
-                        sx={{ color: '#1748D1' }}
+                        sx={{ color: '#64748B', '&:hover': { color: '#1748D1', bgcolor: '#EEF4FF' } }}
                       >
                         <VisibilityRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
 
-                    <Tooltip title="Copy Login Credentials">
+                    <Tooltip title="Edit Teacher Profile">
                       <IconButton
                         size="small"
-                        onClick={() => handleCopyCredentials(teacher)}
-                        sx={{ color: '#D97706' }}
+                        onClick={() => handleOpenEditTeacher(teacher)}
+                        sx={{ color: '#1748D1', '&:hover': { bgcolor: '#EEF4FF' } }}
                       >
-                        <KeyRoundedIcon fontSize="small" />
+                        <EditRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                   </Stack>
@@ -439,9 +483,6 @@ export default function TeachersPage() {
                         sx={{
                           bgcolor: '#1748D1',
                           fontWeight: 700,
-                          px: 3,
-                          py: 1,
-                          '&:hover': { bgcolor: '#092B91' },
                         }}
                       >
                         Add First Teacher
@@ -454,6 +495,171 @@ export default function TeachersPage() {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* Edit Teacher Modal */}
+      <Dialog
+        open={Boolean(editingTeacher)}
+        onClose={() => !savingEdit && setEditingTeacher(null)}
+        maxWidth="sm"
+        fullWidth
+        slotProps={{ paper: { sx: { borderRadius: '16px' } } }}
+      >
+        <form onSubmit={handleSaveEditTeacher}>
+          <DialogTitle sx={{ fontWeight: 800, color: '#061B57', pb: 1 }}>
+            Edit Teacher Profile
+          </DialogTitle>
+          <DialogContent dividers sx={{ py: 2.5 }}>
+            <Stack spacing={2.5}>
+              {/* 1. Basic Information */}
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    required
+                    fullWidth
+                    label="Full Name"
+                    value={editFullName}
+                    onChange={(e) => setEditFullName(e.target.value)}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 3 }}>
+                  <TextField
+                    fullWidth
+                    label="Nickname"
+                    placeholder="e.g. Nayan"
+                    value={editNickname}
+                    onChange={(e) => setEditNickname(e.target.value)}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 3 }}>
+                  <TextField
+                    fullWidth
+                    label="Designation / Title"
+                    placeholder="e.g. Senior Faculty"
+                    value={editDesignation}
+                    onChange={(e) => setEditDesignation(e.target.value)}
+                  />
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    fullWidth
+                    type="date"
+                    label="Date of Birth"
+                    value={editDob}
+                    onChange={(e) => setEditDob(e.target.value)}
+                    slotProps={{ inputLabel: { shrink: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <FormControl fullWidth>
+                    <InputLabel>Gender</InputLabel>
+                    <Select
+                      value={editGender}
+                      label="Gender"
+                      onChange={(e) => setEditGender(e.target.value as any)}
+                    >
+                      <MenuItem value="Male">Male</MenuItem>
+                      <MenuItem value="Female">Female</MenuItem>
+                      <MenuItem value="Other">Other</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid size={{ xs: 12 }}>
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={2.5}
+                    label="Short Bio &amp; Teaching Style"
+                    placeholder="Brief summary of teaching philosophy and classroom approach..."
+                    value={editBio}
+                    onChange={(e) => setEditBio(e.target.value)}
+                  />
+                </Grid>
+              </Grid>
+
+              {/* 2. Academic & Experience (Experience after Bio) */}
+              <TextField
+                fullWidth
+                multiline
+                rows={2.5}
+                label="Educational Details"
+                placeholder="e.g. BSc in Mechanical Engineering, CUET"
+                value={editEducationalDetails}
+                onChange={(e) => setEditEducationalDetails(e.target.value)}
+                helperText="Mention university, degree, and relevant specialization."
+              />
+
+              <TextField
+                fullWidth
+                multiline
+                rows={2.5}
+                label="Teaching Experience"
+                placeholder="e.g. 5+ years teaching Engineering Admission &amp; HSC Physics"
+                value={editExperience}
+                onChange={(e) => setEditExperience(e.target.value)}
+              />
+
+              {/* 3. Contact & Status */}
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    required
+                    fullWidth
+                    label="Mobile Number"
+                    value={editMobile}
+                    onChange={(e) => setEditMobile(e.target.value)}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    fullWidth
+                    label="WhatsApp Number"
+                    value={editWhatsapp}
+                    onChange={(e) => setEditWhatsapp(e.target.value)}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    required
+                    fullWidth
+                    type="email"
+                    label="Login Email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <FormControl fullWidth>
+                    <InputLabel>Status</InputLabel>
+                    <Select
+                      value={editStatus}
+                      label="Status"
+                      onChange={(e) => setEditStatus(e.target.value as any)}
+                    >
+                      <MenuItem value="ACTIVE">Active</MenuItem>
+                      <MenuItem value="INACTIVE">Inactive</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2 }}>
+            <Button onClick={() => setEditingTeacher(null)} disabled={savingEdit}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={savingEdit}
+              sx={{ bgcolor: '#1748D1', fontWeight: 700 }}
+            >
+              {savingEdit ? <CircularProgress size={22} color="inherit" /> : 'Save Changes'}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
 
       {/* Teacher Profile & Credentials Modal */}
       <Dialog
@@ -475,7 +681,7 @@ export default function TeachersPage() {
                 </Avatar>
                 <Box>
                   <Typography variant="h6" component="div" sx={{ fontWeight: 800, color: '#061B57' }}>
-                    {selectedTeacher.fullName} {selectedTeacher.nickname ? `(${selectedTeacher.nickname})` : ''}
+                    {selectedTeacher.fullName}
                   </Typography>
                   <Chip
                     label={selectedTeacher.employeeId}
@@ -499,7 +705,11 @@ export default function TeachersPage() {
                     <Button
                       size="small"
                       startIcon={<ContentCopyRoundedIcon />}
-                      onClick={() => handleCopyCredentials(selectedTeacher)}
+                      onClick={() => {
+                        const text = `ISP Digital Campus — Teacher Login Credentials\nEmployee ID: ${selectedTeacher.employeeId}\nName: ${selectedTeacher.fullName}\nLogin Email: ${selectedTeacher.email}\nPrimary Password: ${selectedTeacher.initialPassword || '********'}\nPortal: https://console.ispctg.live/login`;
+                        navigator.clipboard.writeText(text);
+                        success(`Credentials copied for ${selectedTeacher.fullName} (${selectedTeacher.employeeId})`);
+                      }}
                       sx={{ fontWeight: 700 }}
                     >
                       Copy
@@ -513,91 +723,86 @@ export default function TeachersPage() {
                   <Typography variant="body2" sx={{ fontSize: '13.5px' }}>
                     <strong>Username:</strong> {selectedTeacher.email} &bull; <strong>Password:</strong>{' '}
                     <code style={{ background: '#FFFFFF', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
-                      {selectedTeacher.initialPassword || '********'}
+                      {selectedTeacher.initialPassword || 'Configured in User Account'}
                     </code>
                   </Typography>
                 </Alert>
 
-                {/* Information Grid */}
-                <Grid container spacing={2.5}>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>
-                      GENDER &bull; BIRTHDAY
+                {/* Personal & Professional Details */}
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2.5 }}>
+                  <Box>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                      DESIGNATION
                     </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {selectedTeacher.gender} &bull; {selectedTeacher.dob || 'Not specified'}
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#061B57' }}>
+                      {selectedTeacher.designation || 'Faculty Member'}
                     </Typography>
-                  </Grid>
+                  </Box>
 
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>
-                      ACCOUNT STATUS
+                  <Box>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                      STATUS
                     </Typography>
-                    <Box sx={{ mt: 0.5 }}>
+                    <Box sx={{ mt: 0.3 }}>
                       <StatusChip status={selectedTeacher.status} />
                     </Box>
-                  </Grid>
+                  </Box>
 
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>
-                      MOBILE PHONE
+                  <Box>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                      DATE OF BIRTH &amp; GENDER
                     </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {selectedTeacher.mobile}
+                    <Typography variant="body2">
+                      {selectedTeacher.dob ? `${selectedTeacher.dob} · ` : ''}
+                      {selectedTeacher.gender || 'Not specified'}
                     </Typography>
-                  </Grid>
+                  </Box>
 
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>
-                      WHATSAPP NUMBER
+                  <Box>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                      CONTACT CHANNELS
                     </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {selectedTeacher.whatsapp || selectedTeacher.mobile}
+                    <Typography variant="body2">
+                      Phone: <strong>{selectedTeacher.mobile}</strong>
+                      {selectedTeacher.whatsapp && selectedTeacher.whatsapp !== selectedTeacher.mobile && (
+                        <> &bull; WhatsApp: <strong>{selectedTeacher.whatsapp}</strong></>
+                      )}
                     </Typography>
-                  </Grid>
+                  </Box>
 
-                  <Grid size={{ xs: 12 }}>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>
-                      EDUCATIONAL QUALIFICATIONS
+                  <Box sx={{ gridColumn: 'span 2' }}>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                      EDUCATION &amp; SPECIALIZATION
                     </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {selectedTeacher.educationalDetails}
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#061B57' }}>
+                      {selectedTeacher.educationalDetails || 'Not specified'}
                     </Typography>
-                  </Grid>
+                  </Box>
 
-                  <Grid size={{ xs: 12 }}>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>
-                      TEACHING EXPERIENCE
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {selectedTeacher.experience || 'Not specified'}
-                    </Typography>
-                  </Grid>
+                  {selectedTeacher.experience && (
+                    <Box sx={{ gridColumn: 'span 2' }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                        TEACHING EXPERIENCE
+                      </Typography>
+                      <Typography variant="body2">{selectedTeacher.experience}</Typography>
+                    </Box>
+                  )}
 
                   {selectedTeacher.bio && (
-                    <Grid size={{ xs: 12 }}>
-                      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>
-                        SHORT BIO &amp; TEACHING PHILOSOPHY
+                    <Box sx={{ gridColumn: 'span 2' }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                        BIOGRAPHY / NOTES
                       </Typography>
-                      <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.6 }}>
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                         {selectedTeacher.bio}
                       </Typography>
-                    </Grid>
+                    </Box>
                   )}
-                </Grid>
+                </Box>
               </Stack>
             </DialogContent>
-
-            <DialogActions sx={{ p: 2, justifyContent: 'space-between' }}>
-              <Button
-                color={selectedTeacher.status === 'ACTIVE' ? 'error' : 'success'}
-                onClick={() => handleToggleStatus(selectedTeacher.employeeId)}
-                sx={{ fontWeight: 700 }}
-              >
-                {selectedTeacher.status === 'ACTIVE' ? 'Deactivate Account' : 'Activate Account'}
-              </Button>
-
-              <Button onClick={() => setSelectedTeacher(null)} variant="contained" sx={{ bgcolor: '#061B57' }}>
+            <DialogActions sx={{ px: 3, py: 2 }}>
+              <Button onClick={() => setSelectedTeacher(null)} sx={{ fontWeight: 600 }}>
                 Close
               </Button>
             </DialogActions>

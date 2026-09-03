@@ -1,12 +1,25 @@
 import { NextResponse } from 'next/server';
 import { fetchUserAccount, updateUserAccount } from '@/lib/db/supabaseAccount';
 
+function getCookieValue(cookieHeader: string | null, name: string): string | undefined {
+  if (!cookieHeader) return undefined;
+  const match = cookieHeader.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : undefined;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId') || undefined;
+    const cookieHeader = request.headers.get('cookie');
+    
+    const cookieUid = getCookieValue(cookieHeader, 'isp_console_uid');
+    const cookieRole = getCookieValue(cookieHeader, 'isp_console_role');
 
-    const account = await fetchUserAccount(userId);
+    const userId = searchParams.get('userId') || cookieUid || undefined;
+    const role = searchParams.get('role') || cookieRole || undefined;
+    const email = searchParams.get('email') || undefined;
+
+    const account = await fetchUserAccount(userId, role, email);
     if (!account) {
       return NextResponse.json({ success: false, error: 'User account not found' }, { status: 404 });
     }

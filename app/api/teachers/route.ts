@@ -3,8 +3,9 @@ import {
   fetchTeachersFromSupabase,
   createTeacherInSupabase,
   getNextEmployeeIdFromSupabase,
+  updateTeacherInSupabase,
 } from '@/lib/db/supabaseTeachers';
-import { getTeachers, addTeacher, getNextEmployeeId } from '@/lib/db/teachers';
+import { sendUserCredentialsWelcomeEmail } from '@/lib/email/mailer';
 
 export async function GET() {
   try {
@@ -13,21 +14,17 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      source: 'supabase',
+      source: 'database',
       count: teachers.length,
       nextEmployeeId,
       teachers,
     });
   } catch (err: any) {
     console.error('Error in GET /api/teachers:', err);
-    const fallbackTeachers = getTeachers();
-    return NextResponse.json({
-      success: true,
-      source: 'memory_fallback',
-      count: fallbackTeachers.length,
-      nextEmployeeId: getNextEmployeeId(),
-      teachers: fallbackTeachers,
-    });
+    return NextResponse.json(
+      { success: false, error: err.message || 'Failed to fetch teachers from database' },
+      { status: 500 }
+    );
   }
 }
 
@@ -37,6 +34,7 @@ export async function POST(request: Request) {
     const {
       fullName,
       nickname,
+      designation,
       dob,
       gender,
       bio,
@@ -55,63 +53,46 @@ export async function POST(request: Request) {
       );
     }
 
+    const createdTeacher = await createTeacherInSupabase({
+      fullName,
+      nickname,
+      designation,
+      dob,
+      gender,
+      bio,
+      educationalDetails,
+      experience,
+      mobile,
+      whatsapp,
+      email,
+      initialPassword,
+    });
+
+    // Send Welcome Email with credentials & password change instructions
     try {
-      // Primary: Save directly to Supabase
-      const createdTeacher = await createTeacherInSupabase({
-        fullName,
-        nickname,
-        dob,
-        gender,
-        bio,
-        educationalDetails,
-        experience,
-        mobile,
-        whatsapp,
-        email,
-        initialPassword,
+      await sendUserCredentialsWelcomeEmail({
+        to: createdTeacher.email,
+        fullName: createdTeacher.fullName,
+        role: 'TEACHER',
+        employeeId: createdTeacher.employeeId,
+        initialPassword: createdTeacher.initialPassword,
       });
-
-      return NextResponse.json(
-        {
-          success: true,
-          source: 'supabase',
-          message: `Teacher saved in Supabase database with Employee ID ${createdTeacher.employeeId}`,
-          teacher: createdTeacher,
-        },
-        { status: 201 }
-      );
-    } catch (supabaseError: any) {
-      console.error('Supabase write error, using fallback:', supabaseError);
-
-      // Fallback: save to memory
-      const fallbackTeacher = addTeacher({
-        fullName: fullName.trim(),
-        nickname: nickname ? nickname.trim() : '',
-        dob: dob || undefined,
-        gender: gender || 'Male',
-        bio: bio ? bio.trim() : '',
-        educationalDetails: educationalDetails ? educationalDetails.trim() : '',
-        experience: experience ? experience.trim() : '',
-        mobile: mobile.trim(),
-        whatsapp: whatsapp ? whatsapp.trim() : mobile.trim(),
-        email: email.trim().toLowerCase(),
-        initialPassword,
-        status: 'ACTIVE',
-      });
-
-      return NextResponse.json(
-        {
-          success: true,
-          source: 'memory_fallback',
-          message: `Teacher saved (memory fallback): ${supabaseError.message}`,
-          teacher: fallbackTeacher,
-        },
-        { status: 201 }
-      );
+    } catch (mailErr) {
+      console.warn('Welcome email dispatch notice for teacher:', mailErr);
     }
+
+    return NextResponse.json(
+      {
+        success: true,
+        source: 'database',
+        message: `Teacher saved in database with Employee ID ${createdTeacher.employeeId}`,
+        teacher: createdTeacher,
+      },
+      { status: 201 }
+    );
   } catch (error: any) {
     return NextResponse.json(
-      { success: false, error: error?.message || 'Failed to process teacher registration' },
+      { success: false, error: error?.message || 'Failed to register teacher in database' },
       { status: 500 }
     );
   }
@@ -119,20 +100,20 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const { employeeId, status } = await request.json();
-    if (!employeeId || !status) {
+    const body = await request.json();
+    const { employeeId, ...updates } = body;
+    if (!employeeId) {
       return NextResponse.json(
-        { success: false, error: 'Employee ID and Status are required' },
+        { success: false, error: 'Employee ID is required' },
         { status: 400 }
       );
     }
 
-    const { updateTeacherStatusInSupabase } = await import('@/lib/db/supabaseTeachers');
-    const ok = await updateTeacherStatusInSupabase(employeeId, status);
+    const ok = await updateTeacherInSupabase(employeeId, updates);
 
     return NextResponse.json({
       success: ok,
-      message: ok ? `Status updated to ${status}` : 'Teacher not found',
+      message: ok ? `Teacher updated successfully` : 'Teacher not found',
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

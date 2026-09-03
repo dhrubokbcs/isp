@@ -22,8 +22,9 @@ export function mapSupabaseRow(row: any): Teacher {
   return {
     id: row.id,
     employeeId: row.employee_id || meta.employeeId || 'ISP1001',
-    fullName: row.full_name || u.full_name || 'Unnamed Teacher',
-    nickname: row.nickname || meta.nickname || row.designation || '',
+    fullName: row.full_name || u.full_name || '',
+    nickname: '',
+    designation: row.designation || meta.designation || '',
     dob: row.dob || meta.dob || undefined,
     gender: (row.gender || meta.gender || 'Male') as 'Male' | 'Female' | 'Other',
     bio: row.bio || meta.bio || '',
@@ -83,6 +84,7 @@ export async function getNextEmployeeIdFromSupabase(): Promise<string> {
 export async function createTeacherInSupabase(data: {
   fullName: string;
   nickname?: string;
+  designation?: string;
   dob?: string;
   gender?: 'Male' | 'Female' | 'Other';
   bio?: string;
@@ -98,7 +100,7 @@ export async function createTeacherInSupabase(data: {
   const passwordHash = await hashPassword(initialPassword);
   const now = new Date().toISOString();
 
-  // 1. Insert into public.users table
+  // 1. Create or update user record in public.users
   const userPayload = {
     email: data.email.trim().toLowerCase(),
     password_hash: passwordHash,
@@ -108,13 +110,14 @@ export async function createTeacherInSupabase(data: {
     status: 'ACTIVE',
     metadata: {
       employeeId,
-      nickname: data.nickname ? data.nickname.trim() : '',
-      dob: data.dob || null,
+      nickname: data.nickname || '',
+      designation: data.designation || 'Faculty Member',
       gender: data.gender || 'Male',
-      bio: data.bio ? data.bio.trim() : '',
-      educationalDetails: data.educationalDetails ? data.educationalDetails.trim() : '',
-      experience: data.experience ? data.experience.trim() : '',
-      whatsapp: data.whatsapp ? data.whatsapp.trim() : data.mobile.trim(),
+      dob: data.dob || '',
+      bio: data.bio || '',
+      educationalDetails: data.educationalDetails || '',
+      experience: data.experience || '',
+      whatsapp: data.whatsapp || data.mobile.trim(),
     },
     created_at: now,
     updated_at: now,
@@ -131,23 +134,18 @@ export async function createTeacherInSupabase(data: {
 
   if (!userRes.ok) {
     const errText = await userRes.text();
-    throw new Error(`Failed to create user record in Supabase: ${errText}`);
+    throw new Error(`Failed to create user in Supabase: ${errText}`);
   }
 
-  const createdUsers = await userRes.json();
-  const createdUser = Array.isArray(createdUsers) ? createdUsers[0] : createdUsers;
-  const userId = createdUser?.id;
+  const userRows = await userRes.json();
+  const createdUser = Array.isArray(userRows) ? userRows[0] : userRows;
 
-  if (!userId) {
-    throw new Error('User record was created but no user ID returned.');
-  }
-
-  // 2. Insert into public.teachers table
+  // 2. Create teacher profile in public.teachers
   const teacherPayload = {
-    user_id: userId,
-    designation: data.nickname ? data.nickname.trim() : 'Mentor',
-    specialization: data.educationalDetails ? data.educationalDetails.trim() : '',
-    bio: data.bio ? data.bio.trim() : '',
+    user_id: createdUser.id,
+    designation: data.designation || 'Faculty Member',
+    specialization: data.educationalDetails || '',
+    bio: data.bio || '',
     created_at: now,
     updated_at: now,
   };
@@ -163,44 +161,97 @@ export async function createTeacherInSupabase(data: {
 
   if (!teacherRes.ok) {
     const errText = await teacherRes.text();
-    console.error('Failed to create teacher entry in Supabase:', errText);
-    throw new Error(`Failed to create teacher entry: ${errText}`);
+    throw new Error(`Failed to create teacher profile in Supabase: ${errText}`);
   }
 
-  const createdTeachers = await teacherRes.json();
-  const createdTeacherRow = Array.isArray(createdTeachers) ? createdTeachers[0] : createdTeachers;
+  const teacherRows = await teacherRes.json();
+  const createdTeacher = Array.isArray(teacherRows) ? teacherRows[0] : teacherRows;
 
-  return mapSupabaseRow({
-    ...createdTeacherRow,
-    user: createdUser,
-  });
+  return {
+    id: createdTeacher.id,
+    employeeId,
+    fullName: data.fullName.trim(),
+    nickname: data.nickname || '',
+    designation: data.designation || 'Faculty Member',
+    dob: data.dob,
+    gender: data.gender || 'Male',
+    bio: data.bio || '',
+    educationalDetails: data.educationalDetails || '',
+    experience: data.experience || '',
+    mobile: data.mobile.trim(),
+    whatsapp: data.whatsapp || data.mobile.trim(),
+    email: data.email.trim().toLowerCase(),
+    initialPassword,
+    status: 'ACTIVE',
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
-export async function updateTeacherStatusInSupabase(employeeId: string, status: 'ACTIVE' | 'INACTIVE'): Promise<boolean> {
-  try {
-    const teachers = await fetchTeachersFromSupabase();
-    const target = teachers.find((t) => t.employeeId === employeeId);
-    if (!target) return false;
+export async function updateTeacherInSupabase(
+  employeeId: string,
+  data: Partial<Teacher>
+): Promise<boolean> {
+  const teachers = await fetchTeachersFromSupabase();
+  const teacher = teachers.find((t) => t.employeeId === employeeId);
+  if (!teacher) return false;
 
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/teachers?id=eq.${target.id}&select=user_id`, {
-      headers: getHeaders(),
-    });
-    const rows = await res.json();
-    const userId = rows?.[0]?.user_id;
-    if (!userId) return false;
+  const now = new Date().toISOString();
 
-    await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}`, {
-      method: 'PATCH',
-      headers: getHeaders(),
-      body: JSON.stringify({
-        status,
-        updated_at: new Date().toISOString(),
-      }),
-    });
+  const teacherUpdates: any = { updated_at: now };
+  if (data.designation !== undefined) teacherUpdates.designation = data.designation;
+  if (data.educationalDetails !== undefined) teacherUpdates.specialization = data.educationalDetails;
+  if (data.bio !== undefined) teacherUpdates.bio = data.bio;
 
-    return true;
-  } catch (err) {
-    console.error('Error updating teacher status in Supabase:', err);
-    return false;
+  await fetch(`${SUPABASE_URL}/rest/v1/teachers?id=eq.${teacher.id}`, {
+    method: 'PATCH',
+    headers: getHeaders(),
+    body: JSON.stringify(teacherUpdates),
+  });
+
+  const tRes = await fetch(`${SUPABASE_URL}/rest/v1/teachers?id=eq.${teacher.id}&select=user_id`, {
+    headers: getHeaders(),
+  });
+  if (tRes.ok) {
+    const tRows = await tRes.json();
+    const userId = tRows[0]?.user_id;
+    if (userId) {
+      const uRes = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}&select=metadata`, { headers: getHeaders() });
+      const uRows = await uRes.json();
+      const existingMeta = (uRows && uRows[0]?.metadata) || {};
+
+      const newMeta = {
+        ...existingMeta,
+        ...(data.experience !== undefined ? { experience: data.experience } : {}),
+        ...(data.educationalDetails !== undefined ? { educationalDetails: data.educationalDetails } : {}),
+        ...(data.designation !== undefined ? { designation: data.designation } : {}),
+        ...(data.whatsapp !== undefined ? { whatsapp: data.whatsapp } : {}),
+        ...(data.dob !== undefined ? { dob: data.dob } : {}),
+        ...(data.gender !== undefined ? { gender: data.gender } : {}),
+        ...(data.bio !== undefined ? { bio: data.bio } : {}),
+        ...(data.nickname !== undefined ? { nickname: data.nickname } : {}),
+      };
+
+      const userUpdates: any = { updated_at: now, metadata: newMeta };
+      if (data.fullName) userUpdates.full_name = data.fullName;
+      if (data.email) userUpdates.email = data.email.trim().toLowerCase();
+      if (data.mobile) userUpdates.phone = data.mobile.trim();
+      if (data.status) userUpdates.status = data.status;
+
+      await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}`, {
+        method: 'PATCH',
+        headers: getHeaders(),
+        body: JSON.stringify(userUpdates),
+      });
+    }
   }
+
+  return true;
+}
+
+export async function updateTeacherStatusInSupabase(
+  employeeId: string,
+  status: 'ACTIVE' | 'INACTIVE'
+): Promise<boolean> {
+  return updateTeacherInSupabase(employeeId, { status });
 }

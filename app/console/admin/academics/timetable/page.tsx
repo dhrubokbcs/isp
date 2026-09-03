@@ -29,17 +29,34 @@ import {
   Tooltip,
   Switch,
   Alert,
+  CircularProgress,
+  Grid,
 } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import AccessTimeRoundedIcon from '@mui/icons-material/AccessTimeRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
+import MeetingRoomRoundedIcon from '@mui/icons-material/MeetingRoomRounded';
+import SchoolRoundedIcon from '@mui/icons-material/SchoolRounded';
 
 import PageHeader from '@/components/common/PageHeader';
 import StatusChip from '@/components/common/StatusChip';
 import { useToast } from '@/components/common/ToastProvider';
 import { ispColors } from '@/theme/colors';
-import { TimetableSession } from '@/lib/db/supabaseAcademics';
+
+export interface TimetableSession {
+  id: string;
+  batchId?: string;
+  batchName: string;
+  cohort: string;
+  subject: string;
+  teacherName: string;
+  roomNumber: string;
+  dayOfWeek: 'SATURDAY' | 'SUNDAY' | 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY';
+  startTime: string;
+  endTime: string;
+  isActive: boolean;
+}
 
 const DAYS = ['ALL', 'SATURDAY', 'SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'];
 
@@ -50,48 +67,77 @@ export default function TimetablePage() {
   const [loading, setLoading] = React.useState(true);
   const [selectedDay, setSelectedDay] = React.useState('ALL');
 
-  // Add Modal
+  // Academic Dropdown Options (Dynamically Loaded)
+  const [batches, setBatches] = React.useState<any[]>([]);
+  const [teachers, setTeachers] = React.useState<any[]>([]);
+  const [subjects, setSubjects] = React.useState<any[]>([]);
+  const [rooms, setRooms] = React.useState<any[]>([]);
+
+  // Add Modal State
   const [openDialog, setOpenDialog] = React.useState(false);
-  const [batchName, setBatchName] = React.useState('SSC 2028 Science Morning A');
-  const [cohort, setCohort] = React.useState('SSC 2028');
-  const [subject, setSubject] = React.useState('Physics 1st Paper');
-  const [teacherName, setTeacherName] = React.useState('');
-  const [roomNumber, setRoomNumber] = React.useState('Room 101');
-  const [dayOfWeek, setDayOfWeek] = React.useState('SATURDAY');
-  const [startTime, setStartTime] = React.useState('08:00 AM');
-  const [endTime, setEndTime] = React.useState('09:30 AM');
+  const [formBatchId, setFormBatchId] = React.useState('');
+  const [formSubjectName, setFormSubjectName] = React.useState('');
+  const [formTeacherName, setFormTeacherName] = React.useState('');
+  const [formRoomNumber, setFormRoomNumber] = React.useState('Room 101');
+  const [formDayOfWeek, setFormDayOfWeek] = React.useState('SATURDAY');
+  const [formStartTime, setFormStartTime] = React.useState('07:30 AM');
+  const [formEndTime, setFormEndTime] = React.useState('09:00 AM');
   const [submitting, setSubmitting] = React.useState(false);
 
-  // Edit Modal
+  // Edit Modal State
   const [editSession, setEditSession] = React.useState<TimetableSession | null>(null);
-  const [editBatch, setEditBatch] = React.useState('');
-  const [editCohort, setEditCohort] = React.useState('');
-  const [editSubject, setEditSubject] = React.useState('');
-  const [editTeacher, setEditTeacher] = React.useState('');
-  const [editRoom, setEditRoom] = React.useState('');
-  const [editDay, setEditDay] = React.useState('SATURDAY');
-  const [editStart, setEditStart] = React.useState('');
-  const [editEnd, setEditEnd] = React.useState('');
+  const [editBatchName, setEditBatchName] = React.useState('');
+  const [editSubjectName, setEditSubjectName] = React.useState('');
+  const [editTeacherName, setEditTeacherName] = React.useState('');
+  const [editRoomNumber, setEditRoomNumber] = React.useState('');
+  const [editDayOfWeek, setEditDayOfWeek] = React.useState('SATURDAY');
+  const [editStartTime, setEditStartTime] = React.useState('');
+  const [editEndTime, setEditEndTime] = React.useState('');
   const [submittingEdit, setSubmittingEdit] = React.useState(false);
 
   // Delete Modal
   const [deleteSessionItem, setDeleteSessionItem] = React.useState<TimetableSession | null>(null);
   const [submittingDelete, setSubmittingDelete] = React.useState(false);
 
+  // Load Timetable and Dynamic Options
   const loadTimetable = React.useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/academics/timetable');
-      const data = await res.json();
-      if (data?.success && Array.isArray(data.sessions)) {
-        setSessions(data.sessions);
-      } else {
-        setSessions([]);
+      const [timeRes, batchRes, teachRes, subjRes, roomRes] = await Promise.all([
+        fetch('/api/academics/timetable'),
+        fetch('/api/academics/batches'),
+        fetch('/api/teachers'),
+        fetch('/api/academics/subjects'),
+        fetch('/api/academics/rooms'),
+      ]);
+
+      if (timeRes.ok) {
+        const data = await timeRes.json();
+        setSessions(data.sessions || []);
+      }
+
+      if (batchRes.ok) {
+        const bData = await batchRes.json();
+        setBatches(bData.batches || []);
+      }
+
+      if (teachRes.ok) {
+        const tData = await teachRes.json();
+        setTeachers(tData.teachers || []);
+      }
+
+      if (subjRes.ok) {
+        const sData = await subjRes.json();
+        setSubjects(sData.subjects || []);
+      }
+
+      if (roomRes.ok) {
+        const rData = await roomRes.json();
+        setRooms(rData.rooms || []);
       }
     } catch (err) {
       console.error('Failed to load timetable:', err);
       toastError('Failed to load routine from database');
-      setSessions([]);
     } finally {
       setLoading(false);
     }
@@ -106,15 +152,23 @@ export default function TimetablePage() {
     return sessions.filter((s) => s.dayOfWeek === selectedDay);
   }, [sessions, selectedDay]);
 
-  // Create handler
+  // Open Create Modal
   const handleOpenCreate = () => {
-    setTeacherName('');
+    if (batches.length > 0) setFormBatchId(batches[0].id);
+    if (subjects.length > 0) setFormSubjectName(subjects[0].name);
+    if (teachers.length > 0) setFormTeacherName(teachers[0].fullName || teachers[0].nickname);
+    if (rooms.length > 0) setFormRoomNumber(rooms[0].roomNumber);
+    setFormDayOfWeek('SATURDAY');
+    setFormStartTime('07:30 AM');
+    setFormEndTime('09:00 AM');
     setOpenDialog(true);
   };
 
+  // Submit Create Session
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!batchName.trim() || !subject.trim() || !teacherName.trim()) return;
+    const batchObj = batches.find((b) => b.id === formBatchId);
+    const batchName = batchObj?.name || 'Academic Batch';
 
     setSubmitting(true);
     try {
@@ -122,14 +176,14 @@ export default function TimetablePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          batchId: formBatchId,
           batchName,
-          cohort,
-          subject,
-          teacherName,
-          roomNumber,
-          dayOfWeek,
-          startTime,
-          endTime,
+          subject: formSubjectName,
+          teacherName: formTeacherName,
+          roomNumber: formRoomNumber,
+          dayOfWeek: formDayOfWeek,
+          startTime: formStartTime,
+          endTime: formEndTime,
         }),
       });
 
@@ -138,7 +192,7 @@ export default function TimetablePage() {
         throw new Error(data.error || 'Failed to add class session');
       }
 
-      success(`Session for ${subject} scheduled successfully!`);
+      success(`Session for ${formSubjectName} (${formDayOfWeek}) added to routine!`);
       setOpenDialog(false);
       loadTimetable();
     } catch (err: any) {
@@ -148,11 +202,9 @@ export default function TimetablePage() {
     }
   };
 
-  // Status toggle handler
+  // Status Toggle
   const handleToggleStatus = async (s: TimetableSession) => {
     const nextStatus = !s.isActive;
-
-    // Optimistic UI update
     setSessions((prev) =>
       prev.map((item) => (item.id === s.id ? { ...item, isActive: nextStatus } : item))
     );
@@ -161,39 +213,33 @@ export default function TimetablePage() {
       const res = await fetch('/api/academics/timetable', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: s.id,
-          action: 'TOGGLE_STATUS',
-          isActive: nextStatus,
-        }),
+        body: JSON.stringify({ id: s.id, action: 'TOGGLE_STATUS', isActive: nextStatus }),
       });
       const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to update status');
-      }
-      info(`Class session is now ${nextStatus ? 'Active' : 'Paused / Cancelled'}.`);
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to update status');
+      info(`Class slot is now ${nextStatus ? 'Active' : 'Paused'}.`);
     } catch (err: any) {
       toastError(err.message || 'Error updating status');
       loadTimetable();
     }
   };
 
-  // Edit handler
+  // Open Edit Modal
   const handleOpenEdit = (s: TimetableSession) => {
     setEditSession(s);
-    setEditBatch(s.batchName);
-    setEditCohort(s.cohort);
-    setEditSubject(s.subject);
-    setEditTeacher(s.teacherName);
-    setEditRoom(s.roomNumber);
-    setEditDay(s.dayOfWeek);
-    setEditStart(s.startTime);
-    setEditEnd(s.endTime);
+    setEditBatchName(s.batchName);
+    setEditSubjectName(s.subject);
+    setEditTeacherName(s.teacherName);
+    setEditRoomNumber(s.roomNumber);
+    setEditDayOfWeek(s.dayOfWeek);
+    setEditStartTime(s.startTime);
+    setEditEndTime(s.endTime);
   };
 
+  // Submit Edit
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editSession || !editBatch.trim() || !editSubject.trim() || !editTeacher.trim()) return;
+    if (!editSession) return;
 
     setSubmittingEdit(true);
     try {
@@ -202,23 +248,20 @@ export default function TimetablePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: editSession.id,
-          batchName: editBatch,
-          cohort: editCohort,
-          subject: editSubject,
-          teacherName: editTeacher,
-          roomNumber: editRoom,
-          dayOfWeek: editDay,
-          startTime: editStart,
-          endTime: editEnd,
+          batchName: editBatchName,
+          subject: editSubjectName,
+          teacherName: editTeacherName,
+          roomNumber: editRoomNumber,
+          dayOfWeek: editDayOfWeek,
+          startTime: editStartTime,
+          endTime: editEndTime,
         }),
       });
 
       const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to update session');
-      }
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to update session');
 
-      success(`Class session for ${editSubject} updated!`);
+      success(`Routine slot updated successfully!`);
       setEditSession(null);
       loadTimetable();
     } catch (err: any) {
@@ -228,11 +271,7 @@ export default function TimetablePage() {
     }
   };
 
-  // Delete handler
-  const handleOpenDelete = (s: TimetableSession) => {
-    setDeleteSessionItem(s);
-  };
-
+  // Delete Session
   const handleConfirmDelete = async () => {
     if (!deleteSessionItem) return;
 
@@ -242,11 +281,9 @@ export default function TimetablePage() {
         method: 'DELETE',
       });
       const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to delete session');
-      }
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to delete session');
 
-      success(`Class session for ${deleteSessionItem.subject} removed from routine.`);
+      success(`Class period for ${deleteSessionItem.subject} removed from routine.`);
       setDeleteSessionItem(null);
       loadTimetable();
     } catch (err: any) {
@@ -257,10 +294,10 @@ export default function TimetablePage() {
   };
 
   return (
-    <Box>
+    <Box sx={{ pb: 6 }}>
       <PageHeader
         title="Timetable &amp; Class Schedules"
-        subtitle={`Total Scheduled Classes: ${sessions.length} (Active: ${sessions.filter((s) => s.isActive).length})`}
+        subtitle={`Total Scheduled Classes: ${sessions.length} · (Active: ${sessions.filter((s) => s.isActive).length})`}
         action={
           <Button
             variant="contained"
@@ -297,7 +334,7 @@ export default function TimetablePage() {
         </Tabs>
       </Box>
 
-      {/* Table (No Card background) */}
+      {/* Table Container */}
       <TableContainer
         component={Paper}
         sx={{
@@ -310,10 +347,10 @@ export default function TimetablePage() {
           <TableHead sx={{ bgcolor: '#F8FAFC' }}>
             <TableRow>
               <TableCell sx={{ fontWeight: 700, fontSize: '13px' }}>Day &amp; Time Slot</TableCell>
-              <TableCell sx={{ fontWeight: 700, fontSize: '13px' }}>Batch &amp; Cohort</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: '13px' }}>Batch</TableCell>
               <TableCell sx={{ fontWeight: 700, fontSize: '13px' }}>Subject</TableCell>
-              <TableCell sx={{ fontWeight: 700, fontSize: '13px' }}>Instructor / Teacher</TableCell>
-              <TableCell sx={{ fontWeight: 700, fontSize: '13px' }}>Room</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: '13px' }}>Assigned Instructor</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: '13px' }}>Room / Lab</TableCell>
               <TableCell sx={{ fontWeight: 700, fontSize: '13px' }}>Status</TableCell>
               <TableCell align="right" sx={{ fontWeight: 700, fontSize: '13px' }}>
                 Actions
@@ -337,6 +374,7 @@ export default function TimetablePage() {
                       fontSize: '11px',
                       bgcolor: '#EEF4FF',
                       color: '#1748D1',
+                      borderRadius: '4px',
                     }}
                   />
                 </TableCell>
@@ -345,17 +383,6 @@ export default function TimetablePage() {
                   <Typography variant="body2" sx={{ fontWeight: 700, color: '#061B57' }}>
                     {s.batchName}
                   </Typography>
-                  <Chip
-                    label={s.cohort}
-                    size="small"
-                    sx={{
-                      mt: 0.4,
-                      fontWeight: 700,
-                      fontSize: '11px',
-                      bgcolor: s.cohort.includes('SSC') ? '#ECFDF5' : '#FEF3C7',
-                      color: s.cohort.includes('SSC') ? '#065F46' : '#92400E',
-                    }}
-                  />
                 </TableCell>
 
                 <TableCell sx={{ fontWeight: 600, color: '#061B57', fontSize: '14px' }}>
@@ -370,14 +397,14 @@ export default function TimetablePage() {
                   <Chip
                     label={s.roomNumber}
                     size="small"
-                    sx={{ fontWeight: 700, fontSize: '11.5px', bgcolor: '#F1F5F9', color: '#334155' }}
+                    sx={{ fontWeight: 700, fontSize: '11.5px', bgcolor: '#F1F5F9', color: '#334155', borderRadius: '4px' }}
                   />
                 </TableCell>
 
                 <TableCell>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <StatusChip status={s.isActive ? 'ACTIVE' : 'INACTIVE'} />
-                    <Tooltip title={s.isActive ? 'Click to Pause Class Session' : 'Click to Activate Session'}>
+                    <Tooltip title={s.isActive ? 'Click to Pause Class Slot' : 'Click to Activate Slot'}>
                       <Switch
                         size="small"
                         checked={s.isActive}
@@ -403,7 +430,7 @@ export default function TimetablePage() {
                     <Tooltip title="Delete Class Session">
                       <IconButton
                         size="small"
-                        onClick={() => handleOpenDelete(s)}
+                        onClick={() => setDeleteSessionItem(s)}
                         sx={{ color: '#EF4444', '&:hover': { bgcolor: '#FEE2E2' } }}
                       >
                         <DeleteOutlineRoundedIcon fontSize="small" />
@@ -417,7 +444,8 @@ export default function TimetablePage() {
             {loading ? (
               <TableRow>
                 <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
-                  <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                  <CircularProgress size={28} />
+                  <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600, mt: 1.5 }}>
                     Loading routine from database...
                   </Typography>
                 </TableCell>
@@ -449,82 +477,122 @@ export default function TimetablePage() {
         </Table>
       </TableContainer>
 
-      {/* Schedule Slot Modal */}
+      {/* Schedule Slot Modal (Fully Dynamic Dropdowns) */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
         <form onSubmit={handleCreateSession}>
-          <DialogTitle component="div" sx={{ fontWeight: 800, color: '#061B57', pb: 1 }}>
+          <DialogTitle sx={{ fontWeight: 800, color: '#061B57', pb: 1 }}>
             Schedule New Class Slot
           </DialogTitle>
           <DialogContent dividers sx={{ py: 2.5 }}>
             <Stack spacing={2.5}>
-              <TextField
-                required
-                fullWidth
-                label="Batch Name"
-                placeholder="e.g. SSC 2028 Science Morning A"
-                value={batchName}
-                onChange={(e) => setBatchName(e.target.value)}
-              />
-              <TextField
-                fullWidth
-                label="Target Cohort"
-                placeholder="e.g. SSC 2028, HSC 2027, Session 2026"
-                value={cohort}
-                onChange={(e) => setCohort(e.target.value)}
-              />
-              <TextField
-                required
-                fullWidth
-                label="Subject"
-                placeholder="e.g. Physics 1st Paper, Chemistry"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-              />
-              <TextField
-                required
-                fullWidth
-                label="Teacher / Instructor"
-                placeholder="e.g. Irfanur Rashid Nayan"
-                value={teacherName}
-                onChange={(e) => setTeacherName(e.target.value)}
-              />
-              <FormControl fullWidth>
-                <InputLabel>Day of Week</InputLabel>
-                <Select
-                  value={dayOfWeek}
-                  label="Day of Week"
-                  onChange={(e) => setDayOfWeek(e.target.value)}
-                >
-                  {DAYS.filter((d) => d !== 'ALL').map((d) => (
-                    <MenuItem key={d} value={d}>
-                      {d}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <TextField
-                fullWidth
-                label="Room Number"
-                placeholder="e.g. Room 101, Lab 201"
-                value={roomNumber}
-                onChange={(e) => setRoomNumber(e.target.value)}
-              />
-              <Box sx={{ display: 'flex', gap: 2 }}>
-                <TextField
-                  fullWidth
-                  label="Start Time"
-                  placeholder="08:00 AM"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                />
-                <TextField
-                  fullWidth
-                  label="End Time"
-                  placeholder="09:30 AM"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                />
-              </Box>
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <FormControl fullWidth required>
+                    <InputLabel>Batch</InputLabel>
+                    <Select
+                      value={formBatchId}
+                      label="Batch"
+                      onChange={(e) => setFormBatchId(e.target.value)}
+                    >
+                      {batches.map((b) => (
+                        <MenuItem key={b.id} value={b.id}>
+                          {b.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <FormControl fullWidth required>
+                    <InputLabel>Subject</InputLabel>
+                    <Select
+                      value={formSubjectName}
+                      label="Subject"
+                      onChange={(e) => setFormSubjectName(e.target.value)}
+                    >
+                      {subjects.map((s) => (
+                        <MenuItem key={s.id || s.code} value={s.name}>
+                          {s.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <FormControl fullWidth required>
+                    <InputLabel>Teacher / Instructor</InputLabel>
+                    <Select
+                      value={formTeacherName}
+                      label="Teacher / Instructor"
+                      onChange={(e) => setFormTeacherName(e.target.value)}
+                    >
+                      {teachers.map((t) => (
+                        <MenuItem key={t.id} value={t.fullName}>
+                          {t.fullName} {t.designation ? `(${t.designation})` : ''}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <FormControl fullWidth required>
+                    <InputLabel>Room / Lab</InputLabel>
+                    <Select
+                      value={formRoomNumber}
+                      label="Room / Lab"
+                      onChange={(e) => setFormRoomNumber(e.target.value)}
+                    >
+                      {rooms.map((r) => (
+                        <MenuItem key={r.id || r.roomNumber} value={r.roomNumber}>
+                          {r.roomNumber} - {r.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <FormControl fullWidth required>
+                    <InputLabel>Day of Week</InputLabel>
+                    <Select
+                      value={formDayOfWeek}
+                      label="Day of Week"
+                      onChange={(e) => setFormDayOfWeek(e.target.value)}
+                    >
+                      {DAYS.filter((d) => d !== 'ALL').map((d) => (
+                        <MenuItem key={d} value={d}>
+                          {d}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={{ xs: 6, sm: 4 }}>
+                  <TextField
+                    required
+                    fullWidth
+                    label="Start Time"
+                    placeholder="07:30 AM"
+                    value={formStartTime}
+                    onChange={(e) => setFormStartTime(e.target.value)}
+                  />
+                </Grid>
+                <Grid size={{ xs: 6, sm: 4 }}>
+                  <TextField
+                    required
+                    fullWidth
+                    label="End Time"
+                    placeholder="09:00 AM"
+                    value={formEndTime}
+                    onChange={(e) => setFormEndTime(e.target.value)}
+                  />
+                </Grid>
+              </Grid>
             </Stack>
           </DialogContent>
           <DialogActions sx={{ px: 3, py: 2 }}>
@@ -537,7 +605,7 @@ export default function TimetablePage() {
               disabled={submitting}
               sx={{ bgcolor: '#1748D1', fontWeight: 700 }}
             >
-              {submitting ? 'Saving...' : 'Save Schedule Slot'}
+              {submitting ? <CircularProgress size={22} color="inherit" /> : 'Save Class Slot'}
             </Button>
           </DialogActions>
         </form>
@@ -546,72 +614,117 @@ export default function TimetablePage() {
       {/* Edit Session Slot Modal */}
       <Dialog open={Boolean(editSession)} onClose={() => setEditSession(null)} maxWidth="sm" fullWidth>
         <form onSubmit={handleSaveEdit}>
-          <DialogTitle component="div" sx={{ fontWeight: 800, color: '#061B57', pb: 1 }}>
+          <DialogTitle sx={{ fontWeight: 800, color: '#061B57', pb: 1 }}>
             Edit Class Slot Details
           </DialogTitle>
           <DialogContent dividers sx={{ py: 2.5 }}>
             <Stack spacing={2.5}>
-              <TextField
-                required
-                fullWidth
-                label="Batch Name"
-                value={editBatch}
-                onChange={(e) => setEditBatch(e.target.value)}
-              />
-              <TextField
-                fullWidth
-                label="Target Cohort"
-                value={editCohort}
-                onChange={(e) => setEditCohort(e.target.value)}
-              />
-              <TextField
-                required
-                fullWidth
-                label="Subject"
-                value={editSubject}
-                onChange={(e) => setEditSubject(e.target.value)}
-              />
-              <TextField
-                required
-                fullWidth
-                label="Teacher / Instructor"
-                value={editTeacher}
-                onChange={(e) => setEditTeacher(e.target.value)}
-              />
-              <FormControl fullWidth>
-                <InputLabel>Day of Week</InputLabel>
-                <Select
-                  value={editDay}
-                  label="Day of Week"
-                  onChange={(e) => setEditDay(e.target.value)}
-                >
-                  {DAYS.filter((d) => d !== 'ALL').map((d) => (
-                    <MenuItem key={d} value={d}>
-                      {d}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <TextField
-                fullWidth
-                label="Room Number"
-                value={editRoom}
-                onChange={(e) => setEditRoom(e.target.value)}
-              />
-              <Box sx={{ display: 'flex', gap: 2 }}>
-                <TextField
-                  fullWidth
-                  label="Start Time"
-                  value={editStart}
-                  onChange={(e) => setEditStart(e.target.value)}
-                />
-                <TextField
-                  fullWidth
-                  label="End Time"
-                  value={editEnd}
-                  onChange={(e) => setEditEnd(e.target.value)}
-                />
-              </Box>
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <FormControl fullWidth required>
+                    <InputLabel>Batch</InputLabel>
+                    <Select
+                      value={editBatchName}
+                      label="Batch"
+                      onChange={(e) => setEditBatchName(e.target.value)}
+                    >
+                      {batches.map((b) => (
+                        <MenuItem key={b.id} value={b.name}>
+                          {b.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <FormControl fullWidth required>
+                    <InputLabel>Subject</InputLabel>
+                    <Select
+                      value={editSubjectName}
+                      label="Subject"
+                      onChange={(e) => setEditSubjectName(e.target.value)}
+                    >
+                      {subjects.map((s) => (
+                        <MenuItem key={s.id || s.code} value={s.name}>
+                          {s.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <FormControl fullWidth required>
+                    <InputLabel>Teacher / Instructor</InputLabel>
+                    <Select
+                      value={editTeacherName}
+                      label="Teacher / Instructor"
+                      onChange={(e) => setEditTeacherName(e.target.value)}
+                    >
+                      {teachers.map((t) => (
+                        <MenuItem key={t.id} value={t.fullName}>
+                          {t.fullName} {t.designation ? `(${t.designation})` : ''}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <FormControl fullWidth required>
+                    <InputLabel>Room / Lab</InputLabel>
+                    <Select
+                      value={editRoomNumber}
+                      label="Room / Lab"
+                      onChange={(e) => setEditRoomNumber(e.target.value)}
+                    >
+                      {rooms.map((r) => (
+                        <MenuItem key={r.id || r.roomNumber} value={r.roomNumber}>
+                          {r.roomNumber} - {r.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <FormControl fullWidth required>
+                    <InputLabel>Day of Week</InputLabel>
+                    <Select
+                      value={editDayOfWeek}
+                      label="Day of Week"
+                      onChange={(e) => setEditDayOfWeek(e.target.value)}
+                    >
+                      {DAYS.filter((d) => d !== 'ALL').map((d) => (
+                        <MenuItem key={d} value={d}>
+                          {d}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={{ xs: 6, sm: 4 }}>
+                  <TextField
+                    required
+                    fullWidth
+                    label="Start Time"
+                    value={editStartTime}
+                    onChange={(e) => setEditStartTime(e.target.value)}
+                  />
+                </Grid>
+                <Grid size={{ xs: 6, sm: 4 }}>
+                  <TextField
+                    required
+                    fullWidth
+                    label="End Time"
+                    value={editEndTime}
+                    onChange={(e) => setEditEndTime(e.target.value)}
+                  />
+                </Grid>
+              </Grid>
             </Stack>
           </DialogContent>
           <DialogActions sx={{ px: 3, py: 2 }}>
@@ -624,7 +737,7 @@ export default function TimetablePage() {
               disabled={submittingEdit}
               sx={{ bgcolor: '#1748D1', fontWeight: 700 }}
             >
-              {submittingEdit ? 'Updating...' : 'Update Class Slot'}
+              {submittingEdit ? <CircularProgress size={22} color="inherit" /> : 'Update Class Slot'}
             </Button>
           </DialogActions>
         </form>
@@ -632,7 +745,7 @@ export default function TimetablePage() {
 
       {/* Delete Session Confirmation Modal */}
       <Dialog open={Boolean(deleteSessionItem)} onClose={() => setDeleteSessionItem(null)} maxWidth="xs" fullWidth>
-        <DialogTitle component="div" sx={{ fontWeight: 800, color: '#EF4444', pb: 1 }}>
+        <DialogTitle sx={{ fontWeight: 800, color: '#EF4444', pb: 1 }}>
           Delete Class Schedule Slot
         </DialogTitle>
         <DialogContent dividers sx={{ py: 2.5 }}>

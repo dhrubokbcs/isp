@@ -73,48 +73,18 @@ export default function PublicHeader() {
               </Typography>
             </Box>
 
-            {/* Quick Contact & Staff Console Link */}
-            <Stack direction="row" spacing={2.5} sx={{ alignItems: 'center' }}>
-              <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 0.5, color: '#E0E7FF' }}>
-                <LocationOnRoundedIcon sx={{ fontSize: 15, color: ispColors.primary[300] }} />
-                <Typography variant="caption" sx={{ fontSize: '13px' }}>
-                  Bahaddarhat, Karim Tower, Chattogram
-                </Typography>
-              </Box>
-
-              <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 0.5, color: '#E0E7FF' }}>
-                <PhoneRoundedIcon sx={{ fontSize: 15, color: ispColors.primary[300] }} />
-                <Typography
-                  component="a"
-                  href="tel:01841314381"
-                  variant="caption"
-                  sx={{ fontSize: '13px', color: 'inherit', textDecoration: 'none', '&:hover': { color: '#FFFFFF' } }}
-                >
-                  01841-314381 / 01760-184934
-                </Typography>
-              </Box>
-
-              <Divider orientation="vertical" flexItem sx={{ bgcolor: 'rgba(255,255,255,0.15)', height: 14, my: 'auto', display: { xs: 'none', sm: 'block' } }} />
-
-              <Box
-                component={Link}
-                href="/console/login"
-                sx={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 0.6,
-                  color: ispColors.primary[200],
-                  textDecoration: 'none',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  transition: 'color 0.2s',
-                  '&:hover': { color: '#FFFFFF' },
-                }}
+            {/* Quick Contact: Hotline */}
+            <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 0.6, color: '#E0E7FF' }}>
+              <PhoneRoundedIcon sx={{ fontSize: 15, color: ispColors.primary[300] }} />
+              <Typography
+                component="a"
+                href="tel:01841314381"
+                variant="caption"
+                sx={{ fontSize: '13px', color: 'inherit', textDecoration: 'none', fontWeight: 500, '&:hover': { color: '#FFFFFF' } }}
               >
-                <AdminPanelSettingsRoundedIcon sx={{ fontSize: 15 }} />
-                Staff Console
-              </Box>
-            </Stack>
+                01841-314381 / 01760-184934
+              </Typography>
+            </Box>
           </Box>
         </Container>
       </Box>
@@ -168,7 +138,7 @@ export default function PublicHeader() {
                   variant="h6"
                   sx={{
                     fontWeight: 800,
-                    fontSize: { xs: '15px', sm: '17px' },
+                    fontSize: { xs: '15px', sm: '17.5px' },
                     color: '#061B57',
                     lineHeight: 1.15,
                     letterSpacing: '-0.02em',
@@ -180,14 +150,14 @@ export default function PublicHeader() {
                   variant="caption"
                   sx={{
                     color: ispColors.text.muted,
-                    fontSize: '11.5px',
+                    fontSize: '11px',
                     fontWeight: 600,
                     letterSpacing: '0.04em',
                     textTransform: 'uppercase',
                     display: 'block',
                   }}
                 >
-                  Bahaddarhat &bull; Chattogram
+                  Digital Academic Campus
                 </Typography>
               </Box>
             </Link>
@@ -223,51 +193,32 @@ export default function PublicHeader() {
               ))}
             </Stack>
 
-            {/* Desktop Action Buttons */}
-            <Stack direction="row" spacing={1.5} sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center' }}>
+            {/* Desktop Action: Single Login Button */}
+            <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center' }}>
               <Button
-                variant="outlined"
+                variant="contained"
                 component={Link}
                 href="/login"
                 startIcon={<SchoolRoundedIcon />}
                 sx={{
                   height: 42,
-                  px: 2,
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  borderColor: ispColors.border.default,
-                  color: ispColors.primary[700],
-                  bgcolor: ispColors.primary[50],
-                  '&:hover': {
-                    borderColor: ispColors.primary[300],
-                    bgcolor: ispColors.primary[100],
-                  },
-                }}
-              >
-                Student Portal
-              </Button>
-
-              <Button
-                variant="contained"
-                component="a"
-                href="tel:01841314381"
-                startIcon={<PhoneRoundedIcon />}
-                sx={{
-                  height: 42,
-                  px: 2.2,
-                  fontSize: '14px',
+                  px: 2.8,
+                  fontSize: '14.5px',
                   fontWeight: 700,
-                  bgcolor: '#FFD21F',
-                  color: '#061B57',
-                  boxShadow: '0 3px 10px rgba(255, 210, 31, 0.35)',
+                  bgcolor: '#061B57',
+                  color: '#FFD21F',
+                  borderRadius: '10px',
+                  textTransform: 'none',
+                  boxShadow: '0 3px 12px rgba(6, 27, 87, 0.25)',
                   '&:hover': {
-                    bgcolor: '#FFE04D',
+                    bgcolor: '#1748D1',
+                    color: '#FFFFFF',
                   },
                 }}
               >
-                01841-314381
+                Login
               </Button>
-            </Stack>
+            </Box>
 
             {/* Mobile Hamburger Button */}
             <IconButton
@@ -369,66 +320,25 @@ export default function PublicHeader() {
           <Button
             fullWidth
             variant="contained"
-            component="a"
-            href="tel:01841314381"
-            startIcon={<PhoneRoundedIcon />}
-            sx={{
-              height: 44,
-              fontSize: '15px',
-              fontWeight: 800,
-              bgcolor: '#FFD21F',
-              color: '#061B57',
-              '&:hover': { bgcolor: '#FFE04D' },
-            }}
-          >
-            Call: 01841-314381
-          </Button>
-
-          <Button
-            fullWidth
-            variant="outlined"
             component={Link}
             href="/login"
             startIcon={<SchoolRoundedIcon />}
             onClick={handleDrawerToggle}
             sx={{
-              height: 44,
-              fontSize: '14px',
-              fontWeight: 600,
-              bgcolor: ispColors.primary[50],
-              borderColor: ispColors.primary[200],
-              color: ispColors.primary[700],
+              height: 46,
+              fontSize: '15px',
+              fontWeight: 700,
+              bgcolor: '#061B57',
+              color: '#FFD21F',
+              borderRadius: '10px',
+              textTransform: 'none',
+              boxShadow: '0 3px 12px rgba(6, 27, 87, 0.25)',
+              '&:hover': { bgcolor: '#1748D1', color: '#FFFFFF' },
             }}
           >
-            Student Portal
-          </Button>
-
-          <Button
-            fullWidth
-            component={Link}
-            href="/console/login"
-            startIcon={<AdminPanelSettingsRoundedIcon />}
-            onClick={handleDrawerToggle}
-            sx={{
-              height: 40,
-              fontSize: '13px',
-              color: ispColors.text.secondary,
-              '&:hover': { bgcolor: '#F1F5F9' },
-            }}
-          >
-            Staff Console
+            Login
           </Button>
         </Stack>
-
-        {/* Quick Contact Info */}
-        <Box sx={{ p: 1.5, bgcolor: '#F8FAFC', borderRadius: '8px', border: `1px solid ${ispColors.border.default}` }}>
-          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', fontWeight: 600, mb: 0.5 }}>
-            Branch Address (Bahaddarhat)
-          </Typography>
-          <Typography variant="body2" sx={{ fontSize: '13px', color: ispColors.text.primary, lineHeight: 1.5 }}>
-            Behind Kashbon Restaurant, Karim Tower (4th Floor), Chattogram
-          </Typography>
-        </Box>
       </Drawer>
     </>
   );

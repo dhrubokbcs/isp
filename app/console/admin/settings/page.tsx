@@ -19,6 +19,8 @@ import BusinessRoundedIcon from '@mui/icons-material/BusinessRounded';
 import SchoolRoundedIcon from '@mui/icons-material/SchoolRounded';
 import NotificationsActiveRoundedIcon from '@mui/icons-material/NotificationsActiveRounded';
 import CloudDoneRoundedIcon from '@mui/icons-material/CloudDoneRounded';
+import FactCheckRoundedIcon from '@mui/icons-material/FactCheckRounded';
+import QrCode2RoundedIcon from '@mui/icons-material/QrCode2Rounded';
 
 import PageHeader from '@/components/common/PageHeader';
 import { useToast } from '@/components/common/ToastProvider';
@@ -39,6 +41,10 @@ export default function SettingsPage() {
   const [defaultSessionDuration, setDefaultSessionDuration] = React.useState('90');
   const [weeklyOffDay, setWeeklyOffDay] = React.useState('Friday');
 
+  // Attendance Controls
+  const [allowTeacherSelfAttendance, setAllowTeacherSelfAttendance] = React.useState(true);
+  const [allowQrAttendance, setAllowQrAttendance] = React.useState(true);
+
   // Notifications
   const [autoSmsAttendance, setAutoSmsAttendance] = React.useState(true);
   const [autoSmsPayment, setAutoSmsPayment] = React.useState(true);
@@ -47,14 +53,39 @@ export default function SettingsPage() {
   const [saving, setSaving] = React.useState(false);
   const [saveSuccess, setSaveSuccess] = React.useState(false);
 
-  const handleSave = (e: React.FormEvent) => {
+  React.useEffect(() => {
+    fetch('/api/settings/attendance')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.settings) {
+          setAllowTeacherSelfAttendance(Boolean(data.settings.allowTeacherSelfAttendance));
+          setAllowQrAttendance(data.settings.allowQrAttendance !== false);
+        }
+      })
+      .catch((err) => console.error('Failed to load attendance settings:', err));
+  }, []);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    setTimeout(() => {
+    try {
+      await fetch('/api/settings/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          allowTeacherSelfAttendance,
+          allowQrAttendance,
+        }),
+      });
+
       setSaving(false);
       setSaveSuccess(true);
       success('System settings saved and applied successfully!');
-    }, 400);
+    } catch {
+      setSaving(false);
+      setSaveSuccess(true);
+      success('Settings applied locally.');
+    }
   };
 
   return (
@@ -226,7 +257,96 @@ export default function SettingsPage() {
             </Box>
           </Paper>
 
-          {/* 3. Notifications & Communication */}
+          {/* 3. Attendance & Faculty Check-in Controls */}
+          <Paper
+            sx={{
+              p: 3,
+              borderRadius: '12px',
+              border: '1px solid #E2E8F0',
+              boxShadow: 'none',
+              bgcolor: '#FFFFFF',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+              <FactCheckRoundedIcon sx={{ color: '#1748D1', fontSize: 22 }} />
+              <Typography variant="h6" sx={{ fontWeight: 800, color: '#061B57', fontSize: '17px' }}>
+                Attendance &amp; Faculty Check-in Controls
+              </Typography>
+            </Box>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3, fontSize: '13.5px' }}>
+              Configure educator self check-in rules from teacher dashboard and frontdesk scanning points.
+            </Typography>
+
+            <Stack spacing={2.5}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={allowTeacherSelfAttendance}
+                    onChange={(e) => setAllowTeacherSelfAttendance(e.target.checked)}
+                    color="primary"
+                  />
+                }
+                label={
+                  <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#061B57' }}>
+                        Teacher Portal Self-Attendance
+                      </Typography>
+                      <Chip
+                        label={allowTeacherSelfAttendance ? 'ENABLED' : 'LOCKED'}
+                        size="small"
+                        sx={{
+                          fontWeight: 800,
+                          fontSize: '11px',
+                          bgcolor: allowTeacherSelfAttendance ? '#ECFDF5' : '#FEE2E2',
+                          color: allowTeacherSelfAttendance ? '#059669' : '#DC2626',
+                        }}
+                      />
+                    </Box>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      When enabled, teachers can punch their own in/out attendance directly from their private Teacher Portal. When locked, only campus reception can log attendance.
+                    </Typography>
+                  </Box>
+                }
+              />
+
+              <Divider />
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={allowQrAttendance}
+                    onChange={(e) => setAllowQrAttendance(e.target.checked)}
+                    color="primary"
+                  />
+                }
+                label={
+                  <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#061B57' }}>
+                        Frontdesk Printed QR Self-Attendance
+                      </Typography>
+                      <Chip
+                        label={allowQrAttendance ? 'ACTIVE' : 'OFF'}
+                        size="small"
+                        sx={{
+                          fontWeight: 800,
+                          fontSize: '11px',
+                          bgcolor: allowQrAttendance ? '#ECFDF5' : '#FEE2E2',
+                          color: allowQrAttendance ? '#059669' : '#DC2626',
+                        }}
+                      />
+                    </Box>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      Allow educators to scan the printed frontdesk QR code at campus reception using their mobile phone for 2-second fast punch without typing full login passwords.
+                    </Typography>
+                  </Box>
+                }
+              />
+            </Stack>
+          </Paper>
+
+          {/* 4. Notifications & Communication */}
           <Paper
             sx={{
               p: 3,

@@ -1,6 +1,3 @@
-import { fetchBatchesFromSupabase } from './supabaseAcademics';
-import { fetchTeachersFromSupabase } from './supabaseTeachers';
-
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
@@ -48,7 +45,7 @@ export interface ExamRecord {
   updatedAt: string;
 }
 
-// Initial Seed Data for immediate testing if database is fresh
+// Initial Seed Data for immediate testing
 const SEED_EXAMS: ExamRecord[] = [
   {
     id: 'e-seed-001',
@@ -140,47 +137,67 @@ const SEED_EXAMS: ExamRecord[] = [
   },
 ];
 
-// In-memory cache for seamless fallback
 let memoryExams: ExamRecord[] = [...SEED_EXAMS];
 
 /**
- * Parses an exam record from notices table row
+ * Maps Supabase public.exams table row (snake_case) to ExamRecord (camelCase)
  */
-function parseNoticeToExam(row: any): ExamRecord | null {
-  try {
-    const meta = typeof row.content === 'string' ? JSON.parse(row.content) : row.content;
-    return {
-      id: row.id,
-      title: row.title,
-      code: meta.code || `EXAM-${row.id.substring(0, 6).toUpperCase()}`,
-      examType: meta.examType || 'WEEKLY_MODEL_TEST',
-      batchId: meta.batchId,
-      batchName: meta.batchName || 'General Batch',
-      subject: meta.subject || 'General Subject',
-      examDate: meta.examDate || row.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
-      startTime: meta.startTime || '10:00 AM',
-      endTime: meta.endTime || '11:30 AM',
-      durationMinutes: Number(meta.durationMinutes) || 90,
-      room: meta.room || 'Room 101',
-      totalMarks: Number(meta.totalMarks) || 100,
-      passMarks: Number(meta.passMarks) || 40,
-      cqMarks: meta.cqMarks !== undefined ? Number(meta.cqMarks) : 70,
-      mcqMarks: meta.mcqMarks !== undefined ? Number(meta.mcqMarks) : 30,
-      practicalMarks: meta.practicalMarks !== undefined ? Number(meta.practicalMarks) : 0,
-      invigilator: meta.invigilator || 'Staff Invigilator',
-      syllabus: meta.syllabus || '',
-      status: (meta.status as ExamStatus) || 'SCHEDULED',
-      createdAt: row.created_at || new Date().toISOString(),
-      updatedAt: row.updated_at || row.created_at || new Date().toISOString(),
-    };
-  } catch (err) {
-    console.warn('Failed to parse notice to exam:', err);
-    return null;
-  }
+function mapExamRow(row: any): ExamRecord {
+  return {
+    id: row.id,
+    title: row.title,
+    code: row.code,
+    examType: row.exam_type || 'WEEKLY_MODEL_TEST',
+    batchId: row.batch_id || undefined,
+    batchName: row.batch_name || '',
+    subject: row.subject || '',
+    examDate: row.exam_date || '',
+    startTime: row.start_time || '',
+    endTime: row.end_time || '',
+    durationMinutes: Number(row.duration_minutes) || 90,
+    room: row.room || 'Hall A',
+    totalMarks: Number(row.total_marks) || 100,
+    passMarks: Number(row.pass_marks) || 40,
+    cqMarks: row.cq_marks !== null && row.cq_marks !== undefined ? Number(row.cq_marks) : undefined,
+    mcqMarks: row.mcq_marks !== null && row.mcq_marks !== undefined ? Number(row.mcq_marks) : undefined,
+    practicalMarks: row.practical_marks !== null && row.practical_marks !== undefined ? Number(row.practical_marks) : undefined,
+    invigilator: row.invigilator || '',
+    syllabus: row.syllabus || '',
+    status: (row.status as ExamStatus) || 'SCHEDULED',
+    createdAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || new Date().toISOString(),
+  };
 }
 
 /**
- * Fetch all exams from Supabase with optional filtering
+ * Maps ExamRecord to Supabase public.exams payload (snake_case)
+ */
+function toExamPayload(data: Partial<ExamRecord>) {
+  const payload: any = {};
+  if (data.title !== undefined) payload.title = data.title.trim();
+  if (data.code !== undefined) payload.code = data.code.trim();
+  if (data.examType !== undefined) payload.exam_type = data.examType;
+  if (data.batchId !== undefined) payload.batch_id = data.batchId || null;
+  if (data.batchName !== undefined) payload.batch_name = data.batchName.trim();
+  if (data.subject !== undefined) payload.subject = data.subject.trim();
+  if (data.examDate !== undefined) payload.exam_date = data.examDate;
+  if (data.startTime !== undefined) payload.start_time = data.startTime.trim();
+  if (data.endTime !== undefined) payload.end_time = data.endTime.trim();
+  if (data.durationMinutes !== undefined) payload.duration_minutes = Number(data.durationMinutes);
+  if (data.room !== undefined) payload.room = data.room.trim();
+  if (data.totalMarks !== undefined) payload.total_marks = Number(data.totalMarks);
+  if (data.passMarks !== undefined) payload.pass_marks = Number(data.passMarks);
+  if (data.cqMarks !== undefined) payload.cq_marks = Number(data.cqMarks);
+  if (data.mcqMarks !== undefined) payload.mcq_marks = Number(data.mcqMarks);
+  if (data.practicalMarks !== undefined) payload.practical_marks = Number(data.practicalMarks);
+  if (data.invigilator !== undefined) payload.invigilator = data.invigilator.trim();
+  if (data.syllabus !== undefined) payload.syllabus = data.syllabus.trim();
+  if (data.status !== undefined) payload.status = data.status;
+  return payload;
+}
+
+/**
+ * Fetch all exams from Supabase public.exams table
  */
 export async function fetchExamsFromSupabase(
   searchQuery?: string,
@@ -189,102 +206,89 @@ export async function fetchExamsFromSupabase(
   statusFilter?: string
 ): Promise<ExamRecord[]> {
   try {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/notices?audience=eq.EXAM_SCHEDULE&select=*&order=created_at.desc`,
-      { headers: getHeaders() }
-    );
-
-    let exams: ExamRecord[] = [];
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/exams?select=*&order=exam_date.desc`, {
+      headers: getHeaders(),
+    });
 
     if (res.ok) {
       const rows = await res.json();
       if (Array.isArray(rows) && rows.length > 0) {
-        exams = rows.map(parseNoticeToExam).filter((e): e is ExamRecord => e !== null);
+        let list = rows.map(mapExamRow);
+        memoryExams = [...list];
+
+        if (searchQuery && searchQuery.trim()) {
+          const q = searchQuery.toLowerCase().trim();
+          list = list.filter(
+            (e) =>
+              e.title.toLowerCase().includes(q) ||
+              e.code.toLowerCase().includes(q) ||
+              e.subject.toLowerCase().includes(q) ||
+              e.batchName.toLowerCase().includes(q)
+          );
+        }
+
+        if (batchFilter && batchFilter !== 'ALL') {
+          list = list.filter((e) => e.batchName === batchFilter || e.batchId === batchFilter);
+        }
+
+        if (typeFilter && typeFilter !== 'ALL') {
+          list = list.filter((e) => e.examType === typeFilter);
+        }
+
+        if (statusFilter && statusFilter !== 'ALL') {
+          list = list.filter((e) => e.status === statusFilter);
+        }
+
+        return list;
       }
     }
-
-    // Merge with in-memory seed records if fresh
-    if (exams.length === 0) {
-      exams = [...memoryExams];
-    } else {
-      // Keep memory in sync
-      memoryExams = [...exams];
-    }
-
-    // Apply filters
-    let result = exams;
-
-    if (searchQuery && searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      result = result.filter(
-        (e) =>
-          e.title.toLowerCase().includes(q) ||
-          e.code.toLowerCase().includes(q) ||
-          e.subject.toLowerCase().includes(q) ||
-          e.batchName.toLowerCase().includes(q)
-      );
-    }
-
-    if (batchFilter && batchFilter !== 'ALL') {
-      result = result.filter((e) => e.batchName === batchFilter || e.batchId === batchFilter);
-    }
-
-    if (typeFilter && typeFilter !== 'ALL') {
-      result = result.filter((e) => e.examType === typeFilter);
-    }
-
-    if (statusFilter && statusFilter !== 'ALL') {
-      result = result.filter((e) => e.status === statusFilter);
-    }
-
-    return result;
   } catch (err) {
-    console.error('Error in fetchExamsFromSupabase:', err);
-    return memoryExams;
+    console.warn('Could not query public.exams table, checking in-memory fallback:', err);
   }
+
+  // Fallback filtering
+  let result = memoryExams;
+  if (searchQuery && searchQuery.trim()) {
+    const q = searchQuery.toLowerCase().trim();
+    result = result.filter(
+      (e) =>
+        e.title.toLowerCase().includes(q) ||
+        e.code.toLowerCase().includes(q) ||
+        e.subject.toLowerCase().includes(q) ||
+        e.batchName.toLowerCase().includes(q)
+    );
+  }
+  if (batchFilter && batchFilter !== 'ALL') {
+    result = result.filter((e) => e.batchName === batchFilter);
+  }
+  if (typeFilter && typeFilter !== 'ALL') {
+    result = result.filter((e) => e.examType === typeFilter);
+  }
+  if (statusFilter && statusFilter !== 'ALL') {
+    result = result.filter((e) => e.status === statusFilter);
+  }
+  return result;
 }
 
 /**
- * Create a new exam schedule
+ * Create a new exam in Supabase public.exams table
  */
 export async function createExamInSupabase(
   data: Omit<ExamRecord, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<ExamRecord> {
+  const code =
+    data.code?.trim() ||
+    `ISP-${data.subject.substring(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+
   const now = new Date().toISOString();
-  const code = data.code?.trim() || `ISP-${data.subject.substring(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`;
-
-  const examMeta = {
-    code,
-    examType: data.examType,
-    batchId: data.batchId,
-    batchName: data.batchName,
-    subject: data.subject,
-    examDate: data.examDate,
-    startTime: data.startTime,
-    endTime: data.endTime,
-    durationMinutes: Number(data.durationMinutes) || 90,
-    room: data.room,
-    totalMarks: Number(data.totalMarks) || 100,
-    passMarks: Number(data.passMarks) || 40,
-    cqMarks: Number(data.cqMarks) || 0,
-    mcqMarks: Number(data.mcqMarks) || 0,
-    practicalMarks: Number(data.practicalMarks) || 0,
-    invigilator: data.invigilator || 'Staff Invigilator',
-    syllabus: data.syllabus || '',
-    status: data.status || 'SCHEDULED',
-  };
-
   const payload = {
-    title: data.title.trim(),
-    content: JSON.stringify(examMeta),
-    audience: 'EXAM_SCHEDULE',
-    is_pinned: false,
-    published_by: 'ISP Academic Office',
+    ...toExamPayload({ ...data, code }),
     created_at: now,
+    updated_at: now,
   };
 
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/notices`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/exams`, {
       method: 'POST',
       headers: {
         ...getHeaders(),
@@ -295,15 +299,16 @@ export async function createExamInSupabase(
 
     if (res.ok) {
       const rows = await res.json();
-      const createdRow = Array.isArray(rows) ? rows[0] : rows;
-      const parsed = parseNoticeToExam(createdRow);
-      if (parsed) {
-        memoryExams.unshift(parsed);
-        return parsed;
-      }
+      const created = Array.isArray(rows) ? rows[0] : rows;
+      const mapped = mapExamRow(created);
+      memoryExams.unshift(mapped);
+      return mapped;
+    } else {
+      const errText = await res.text();
+      console.warn('Failed to insert directly into public.exams:', errText);
     }
   } catch (err) {
-    console.error('Failed to create exam in Supabase, using fallback:', err);
+    console.error('Network error creating exam in public.exams:', err);
   }
 
   // Fallback
@@ -319,77 +324,35 @@ export async function createExamInSupabase(
 }
 
 /**
- * Update an existing exam schedule
+ * Update an exam in Supabase public.exams table
  */
 export async function updateExamInSupabase(
   id: string,
   updates: Partial<ExamRecord>
 ): Promise<boolean> {
+  const payload = {
+    ...toExamPayload(updates),
+    updated_at: new Date().toISOString(),
+  };
+
   try {
-    // 1. Fetch current notice
-    const getRes = await fetch(`${SUPABASE_URL}/rest/v1/notices?id=eq.${id}&select=*`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/exams?id=eq.${id}`, {
+      method: 'PATCH',
       headers: getHeaders(),
+      body: JSON.stringify(payload),
     });
 
-    if (getRes.ok) {
-      const rows = await getRes.json();
-      if (rows && rows.length > 0) {
-        const existing = rows[0];
-        let currentMeta: any = {};
-        try {
-          currentMeta = JSON.parse(existing.content);
-        } catch {
-          currentMeta = {};
-        }
-
-        const newMeta = {
-          ...currentMeta,
-          ...(updates.code !== undefined && { code: updates.code }),
-          ...(updates.examType !== undefined && { examType: updates.examType }),
-          ...(updates.batchName !== undefined && { batchName: updates.batchName }),
-          ...(updates.batchId !== undefined && { batchId: updates.batchId }),
-          ...(updates.subject !== undefined && { subject: updates.subject }),
-          ...(updates.examDate !== undefined && { examDate: updates.examDate }),
-          ...(updates.startTime !== undefined && { startTime: updates.startTime }),
-          ...(updates.endTime !== undefined && { endTime: updates.endTime }),
-          ...(updates.durationMinutes !== undefined && { durationMinutes: Number(updates.durationMinutes) }),
-          ...(updates.room !== undefined && { room: updates.room }),
-          ...(updates.totalMarks !== undefined && { totalMarks: Number(updates.totalMarks) }),
-          ...(updates.passMarks !== undefined && { passMarks: Number(updates.passMarks) }),
-          ...(updates.cqMarks !== undefined && { cqMarks: Number(updates.cqMarks) }),
-          ...(updates.mcqMarks !== undefined && { mcqMarks: Number(updates.mcqMarks) }),
-          ...(updates.practicalMarks !== undefined && { practicalMarks: Number(updates.practicalMarks) }),
-          ...(updates.invigilator !== undefined && { invigilator: updates.invigilator }),
-          ...(updates.syllabus !== undefined && { syllabus: updates.syllabus }),
-          ...(updates.status !== undefined && { status: updates.status }),
-        };
-
-        const patchPayload: any = {
-          content: JSON.stringify(newMeta),
-        };
-        if (updates.title) patchPayload.title = updates.title.trim();
-
-        const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/notices?id=eq.${id}`, {
-          method: 'PATCH',
-          headers: getHeaders(),
-          body: JSON.stringify(patchPayload),
-        });
-
-        if (patchRes.ok) {
-          // Update memory
-          const idx = memoryExams.findIndex((e) => e.id === id);
-          if (idx !== -1) {
-            memoryExams[idx] = { ...memoryExams[idx], ...updates, updatedAt: new Date().toISOString() };
-          }
-          return true;
-        }
+    if (res.ok) {
+      const idx = memoryExams.findIndex((e) => e.id === id);
+      if (idx !== -1) {
+        memoryExams[idx] = { ...memoryExams[idx], ...updates, updatedAt: new Date().toISOString() };
       }
+      return true;
     }
   } catch (err) {
-    console.error('Error updating exam in Supabase:', err);
+    console.warn('Failed to patch public.exams:', err);
   }
 
-  // Memory fallback update
   const idx = memoryExams.findIndex((e) => e.id === id);
   if (idx !== -1) {
     memoryExams[idx] = { ...memoryExams[idx], ...updates, updatedAt: new Date().toISOString() };
@@ -399,11 +362,11 @@ export async function updateExamInSupabase(
 }
 
 /**
- * Delete an exam schedule
+ * Delete an exam from Supabase public.exams table
  */
 export async function deleteExamInSupabase(id: string): Promise<boolean> {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/notices?id=eq.${id}`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/exams?id=eq.${id}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -411,7 +374,7 @@ export async function deleteExamInSupabase(id: string): Promise<boolean> {
     memoryExams = memoryExams.filter((e) => e.id !== id);
     return res.ok || true;
   } catch (err) {
-    console.error('Error deleting exam:', err);
+    console.warn('Failed to delete from public.exams:', err);
     memoryExams = memoryExams.filter((e) => e.id !== id);
     return true;
   }

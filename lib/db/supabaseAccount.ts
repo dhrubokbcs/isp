@@ -11,6 +11,9 @@ export interface UserAccountData {
   id: string;
   fullName: string;
   nickname: string;
+  employeeId?: string;
+  designation?: string;
+  specialization?: string;
   birthday: string;
   gender: string;
   bio: string;
@@ -55,13 +58,20 @@ export interface UserAccountData {
   };
 }
 
-export async function fetchUserAccount(userId?: string): Promise<UserAccountData | null> {
+export async function fetchUserAccount(
+  userId?: string,
+  role?: string,
+  email?: string
+): Promise<UserAccountData | null> {
   try {
     let url = `${SUPABASE_URL}/rest/v1/users?select=*&limit=1`;
     if (userId) {
       url = `${SUPABASE_URL}/rest/v1/users?id=eq.${userId}&select=*&limit=1`;
+    } else if (email) {
+      url = `${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(email.trim().toLowerCase())}&select=*&limit=1`;
+    } else if (role) {
+      url = `${SUPABASE_URL}/rest/v1/users?role=eq.${role}&select=*&limit=1`;
     } else {
-      // Default to SUPERADMIN or first active user
       url = `${SUPABASE_URL}/rest/v1/users?role=eq.SUPERADMIN&select=*&limit=1`;
     }
 
@@ -77,10 +87,37 @@ export async function fetchUserAccount(userId?: string): Promise<UserAccountData
     const u = rows[0];
     const meta = u.metadata || {};
 
+    let employeeId = meta.employeeId || '';
+    let designation = meta.designation || '';
+    let specialization = meta.specialization || '';
+
+    // If teacher, fetch linked teacher record from public.teachers
+    if (u.role === 'TEACHER') {
+      try {
+        const teacherRes = await fetch(`${SUPABASE_URL}/rest/v1/teachers?user_id=eq.${u.id}&select=*&limit=1`, {
+          headers: getHeaders(),
+        });
+        if (teacherRes.ok) {
+          const tRows = await teacherRes.json();
+          if (Array.isArray(tRows) && tRows.length > 0) {
+            const t = tRows[0];
+            if (t.employee_id) employeeId = t.employee_id;
+            if (t.designation) designation = t.designation;
+            if (t.specialization) specialization = t.specialization;
+          }
+        }
+      } catch (tErr) {
+        console.warn('Could not fetch linked teacher row:', tErr);
+      }
+    }
+
     return {
       id: u.id,
       fullName: u.full_name || '',
       nickname: meta.nickname || '',
+      employeeId: employeeId || undefined,
+      designation: designation || meta.designation || (u.role === 'TEACHER' ? 'Faculty Member' : 'Administrator'),
+      specialization: specialization || undefined,
       birthday: meta.birthday || meta.dob || '',
       gender: meta.gender || 'Male',
       bio: meta.bio || '',
@@ -129,6 +166,7 @@ export async function updateUserAccount(
     const updatedMeta = {
       ...existingMeta,
       ...(data.nickname !== undefined && { nickname: data.nickname }),
+      ...(data.designation !== undefined && { designation: data.designation }),
       ...(data.birthday !== undefined && { birthday: data.birthday, dob: data.birthday }),
       ...(data.gender !== undefined && { gender: data.gender }),
       ...(data.bio !== undefined && { bio: data.bio }),
@@ -161,6 +199,22 @@ export async function updateUserAccount(
     if (!patchRes.ok) {
       console.error('Failed to update user account:', await patchRes.text());
       return false;
+    }
+
+    // Also update public.teachers designation if provided
+    if (data.designation && existing.role === 'TEACHER') {
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/teachers?user_id=eq.${userId}`, {
+          method: 'PATCH',
+          headers: getHeaders(),
+          body: JSON.stringify({
+            designation: data.designation.trim(),
+            updated_at: new Date().toISOString(),
+          }),
+        });
+      } catch (tErr) {
+        console.warn('Could not update teacher designation column:', tErr);
+      }
     }
 
     return true;

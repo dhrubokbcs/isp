@@ -285,3 +285,47 @@ INSERT INTO public.users (
     role = 'SUPERADMIN',
     status = 'ACTIVE',
     updated_at = NOW();
+
+-- 15. EXAMS & SCHEDULES TABLE
+CREATE TABLE IF NOT EXISTS public.exams (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(255) NOT NULL,
+    code VARCHAR(100) NOT NULL UNIQUE,
+    exam_type VARCHAR(50) NOT NULL DEFAULT 'WEEKLY_MODEL_TEST',
+    batch_id UUID REFERENCES public.batches(id) ON DELETE SET NULL,
+    batch_name VARCHAR(150) NOT NULL,
+    subject VARCHAR(150) NOT NULL,
+    exam_date DATE NOT NULL,
+    start_time VARCHAR(50) NOT NULL DEFAULT '10:00 AM',
+    end_time VARCHAR(50) NOT NULL DEFAULT '11:30 AM',
+    duration_minutes INT NOT NULL DEFAULT 90,
+    room VARCHAR(100) NOT NULL DEFAULT 'Hall A (Room 301)',
+    total_marks NUMERIC(6, 2) NOT NULL DEFAULT 100,
+    pass_marks NUMERIC(6, 2) NOT NULL DEFAULT 40,
+    cq_marks NUMERIC(6, 2) DEFAULT 70,
+    mcq_marks NUMERIC(6, 2) DEFAULT 30,
+    practical_marks NUMERIC(6, 2) DEFAULT 0,
+    invigilator VARCHAR(150),
+    syllabus TEXT,
+    status VARCHAR(50) NOT NULL DEFAULT 'SCHEDULED',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_exams_date ON public.exams(exam_date);
+CREATE INDEX IF NOT EXISTS idx_exams_batch ON public.exams(batch_name);
+CREATE INDEX IF NOT EXISTS idx_exams_code ON public.exams(code);
+CREATE INDEX IF NOT EXISTS idx_exams_status ON public.exams(status);
+
+ALTER TABLE public.exams ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+    DROP POLICY IF EXISTS "Allow all access to exams" ON public.exams;
+    CREATE POLICY "Allow all access to exams"
+        ON public.exams
+        FOR ALL
+        TO authenticated, anon, service_role
+        USING (true)
+        WITH CHECK (true);
+END $$;
+

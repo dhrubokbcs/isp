@@ -331,7 +331,7 @@ export default function ExamsSchedulesPage() {
   };
 
   return (
-    <Box sx={{ p: { xs: 2, sm: 3 } }}>
+    <Box>
       {/* 1. Page Header */}
       <PageHeader
         title="Exams &amp; Schedules"
@@ -361,7 +361,7 @@ export default function ExamsSchedulesPage() {
       {/* 2. Key Metrics Cards */}
       <Grid container spacing={2.5} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card sx={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: 'none' }}>
+          <Card sx={{ borderRadius: '12px', border: `1px solid ${ispColors.border.default}`, boxShadow: 'none' }}>
             <CardContent sx={{ p: 2.5 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <Box>
@@ -381,7 +381,7 @@ export default function ExamsSchedulesPage() {
         </Grid>
 
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card sx={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: 'none' }}>
+          <Card sx={{ borderRadius: '12px', border: `1px solid ${ispColors.border.default}`, boxShadow: 'none' }}>
             <CardContent sx={{ p: 2.5 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <Box>
@@ -401,7 +401,7 @@ export default function ExamsSchedulesPage() {
         </Grid>
 
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card sx={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: 'none' }}>
+          <Card sx={{ borderRadius: '12px', border: `1px solid ${ispColors.border.default}`, boxShadow: 'none' }}>
             <CardContent sx={{ p: 2.5 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <Box>
@@ -421,7 +421,7 @@ export default function ExamsSchedulesPage() {
         </Grid>
 
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card sx={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: 'none' }}>
+          <Card sx={{ borderRadius: '12px', border: `1px solid ${ispColors.border.default}`, boxShadow: 'none' }}>
             <CardContent sx={{ p: 2.5 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <Box>
@@ -441,10 +441,18 @@ export default function ExamsSchedulesPage() {
         </Grid>
       </Grid>
 
-      {/* 3. Search and Filters Bar */}
-      <Paper sx={{ p: 2, mb: 3, borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: 'none' }}>
+      {/* 3. Search & Filter Bar */}
+      <Box
+        sx={{
+          mb: 3,
+          p: 2,
+          bgcolor: '#FFFFFF',
+          borderRadius: '12px',
+          border: `1px solid ${ispColors.border.default}`,
+        }}
+      >
         <Grid container spacing={2} sx={{ alignItems: 'center' }}>
-          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <TextField
               fullWidth
               size="small"
@@ -463,12 +471,12 @@ export default function ExamsSchedulesPage() {
             />
           </Grid>
 
-          <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
+          <Grid size={{ xs: 6, sm: 3, md: 2 }}>
             <FormControl fullWidth size="small">
-              <InputLabel>Batch Filter</InputLabel>
+              <InputLabel>Batch</InputLabel>
               <Select
                 value={batchFilter}
-                label="Batch Filter"
+                label="Batch"
                 onChange={(e) => setBatchFilter(e.target.value)}
               >
                 <MenuItem value="ALL">All Batches</MenuItem>
@@ -481,7 +489,7 @@ export default function ExamsSchedulesPage() {
             </FormControl>
           </Grid>
 
-          <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
+          <Grid size={{ xs: 6, sm: 3, md: 2 }}>
             <FormControl fullWidth size="small">
               <InputLabel>Exam Type</InputLabel>
               <Select
@@ -489,16 +497,16 @@ export default function ExamsSchedulesPage() {
                 label="Exam Type"
                 onChange={(e) => setTypeFilter(e.target.value)}
               >
-                <MenuItem value="ALL">All Assessment Types</MenuItem>
-                <MenuItem value="WEEKLY_MODEL_TEST">Weekly Model Test</MenuItem>
-                <MenuItem value="CHAPTER_ASSESSMENT">Chapter Assessment</MenuItem>
-                <MenuItem value="TERM_FINAL">Term Final Exam</MenuItem>
-                <MenuItem value="SCHOLARSHIP_MOCK">Scholarship Mock</MenuItem>
+                <MenuItem value="ALL">All Types</MenuItem>
+                <MenuItem value="WEEKLY_MODEL_TEST">Model Test</MenuItem>
+                <MenuItem value="CHAPTER_ASSESSMENT">Assessment</MenuItem>
+                <MenuItem value="TERM_FINAL">Term Final</MenuItem>
+                <MenuItem value="SCHOLARSHIP_MOCK">Scholarship</MenuItem>
               </Select>
             </FormControl>
           </Grid>
 
-          <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+          <Grid size={{ xs: 6, sm: 3, md: 2 }}>
             <FormControl fullWidth size="small">
               <InputLabel>Status</InputLabel>
               <Select
@@ -506,7 +514,7 @@ export default function ExamsSchedulesPage() {
                 label="Status"
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
-                <MenuItem value="ALL">All Statuses</MenuItem>
+                <MenuItem value="ALL">All Status</MenuItem>
                 <MenuItem value="SCHEDULED">Scheduled</MenuItem>
                 <MenuItem value="ONGOING">Ongoing</MenuItem>
                 <MenuItem value="COMPLETED">Completed</MenuItem>
@@ -516,20 +524,27 @@ export default function ExamsSchedulesPage() {
             </FormControl>
           </Grid>
 
-          <Grid size={{ xs: 12, sm: 6, md: 1 }} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <Grid size={{ xs: 6, sm: 3, md: 2 }} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
             <Tooltip title="Refresh Table">
-              <IconButton onClick={loadData} color="primary" sx={{ border: '1px solid #E2E8F0', borderRadius: '8px' }}>
+              <IconButton onClick={loadData} color="primary" sx={{ border: `1px solid ${ispColors.border.default}`, borderRadius: '8px' }}>
                 <RefreshRoundedIcon />
               </IconButton>
             </Tooltip>
           </Grid>
         </Grid>
-      </Paper>
+      </Box>
 
       {/* 4. Exams Data Table */}
-      <TableContainer component={Paper} sx={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: 'none' }}>
+      <TableContainer
+        component={Paper}
+        sx={{
+          borderRadius: '12px',
+          border: `1px solid ${ispColors.border.default}`,
+          boxShadow: 'none',
+        }}
+      >
         {loading && <LinearProgress />}
-        <Table sx={{ minWidth: 950 }}>
+        <Table sx={{ minWidth: 850 }}>
           <TableHead sx={{ bgcolor: '#F8FAFC' }}>
             <TableRow>
               <TableCell sx={{ fontWeight: 800, color: '#061B57', fontSize: '13px' }}>EXAM CODE &amp; TITLE</TableCell>

@@ -80,12 +80,11 @@ export async function proxy(req: NextRequest) {
     return rewriteResponse;
   }
 
-  // 3. If someone on root domain tries to access /admin, /teacher, /console, or /login, redirect to console subdomain
+  // 3. If someone on root domain tries to access /admin, /teacher, or /console, redirect to console subdomain
   if (
     url.pathname.startsWith('/admin') ||
     url.pathname.startsWith('/teacher') ||
-    url.pathname.startsWith('/console') ||
-    url.pathname === '/login'
+    url.pathname.startsWith('/console')
   ) {
     const port = hostname.includes(':') ? `:${hostname.split(':')[1]}` : '';
     const cleanHost = hostname.split(':')[0].replace(/^www\./, '');

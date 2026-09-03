@@ -83,8 +83,29 @@ export async function POST(request: Request) {
       }
     }
 
-    // 5. Success: return user profile (excluding password_hash)
-    return NextResponse.json({
+    // 5. If teacher, query linked teacher table
+    let employeeId = user.metadata?.employeeId || '';
+    let designation = user.metadata?.designation || (user.role === 'TEACHER' ? 'Faculty Member' : 'Administrator');
+
+    if (user.role === 'TEACHER') {
+      try {
+        const tRes = await fetch(`${SUPABASE_URL}/rest/v1/teachers?user_id=eq.${user.id}&select=*&limit=1`, {
+          headers: getHeaders(),
+        });
+        if (tRes.ok) {
+          const tRows = await tRes.json();
+          if (Array.isArray(tRows) && tRows.length > 0) {
+            if (tRows[0].employee_id) employeeId = tRows[0].employee_id;
+            if (tRows[0].designation) designation = tRows[0].designation;
+          }
+        }
+      } catch (tErr) {
+        console.warn('Could not fetch teacher metadata on login:', tErr);
+      }
+    }
+
+    // 6. Success: return user profile (excluding password_hash)
+    const res = NextResponse.json({
       success: true,
       user: {
         id: user.id,
@@ -92,8 +113,26 @@ export async function POST(request: Request) {
         fullName: user.full_name,
         role: user.role,
         status: user.status,
+        designation,
+        employeeId: employeeId || undefined,
       },
     });
+
+    // Set cookie for session isolation across browser profiles / tabs
+    res.cookies.set('isp_console_uid', user.id, {
+      path: '/',
+      httpOnly: false,
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7,
+    });
+    res.cookies.set('isp_console_role', user.role, {
+      path: '/',
+      httpOnly: false,
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7,
+    });
+
+    return res;
   } catch (err: any) {
     console.error('Login error:', err);
     return NextResponse.json(

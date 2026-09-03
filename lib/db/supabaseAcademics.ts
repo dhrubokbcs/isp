@@ -353,29 +353,26 @@ export async function fetchBatchesFromSupabase(): Promise<BatchRecord[]> {
       }
     );
     if (!res.ok) return [];
-    const rows = await res.json();
-    if (!Array.isArray(rows)) return [];
+    const restRows = await res.json();
+    if (!Array.isArray(restRows)) return [];
 
-    return rows.map((b) => ({
-      id: b.id,
-      name: b.name,
-      code: b.code,
-      academicYearId: b.academic_year_id,
-      academicYearName: b.academic_years?.name || '',
-      programId: b.program_id,
-      programName: b.programs?.name || '',
-      cohortLabel: b.name.includes('SSC')
-        ? 'SSC Board Exam Track'
-        : b.name.includes('HSC')
-        ? 'HSC Board Exam Track'
-        : 'Annual Academic Track',
-      shift: (b.shift || 'MORNING') as 'MORNING' | 'DAY' | 'EVENING',
-      maxCapacity: b.max_capacity || 40,
-      currentEnrolled: b.current_enrolled || 0,
-      isActive: b.is_active ?? true,
-      createdAt: b.created_at,
+    return restRows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      code: r.code,
+      academicYearId: r.academic_year_id,
+      academicYearName: r.academic_years?.name || 'Academic Year 2026',
+      programId: r.program_id,
+      programName: r.programs?.name || 'Academic Program',
+      cohortLabel: r.name.includes('SSC') ? 'SSC Board Track' : r.name.includes('HSC') ? 'HSC Board Track' : 'Academic Cohort',
+      shift: 'DAY' as const,
+      maxCapacity: r.max_capacity || 40,
+      currentEnrolled: 0,
+      isActive: r.is_active ?? true,
+      createdAt: r.created_at,
     }));
-  } catch {
+  } catch (err) {
+    console.error('Error in fetchBatchesFromSupabase:', err);
     return [];
   }
 }
@@ -490,8 +487,6 @@ export interface SubjectRecord {
 }
 
 // In-memory fallback if public.subjects table migration is not yet run in Supabase SQL editor
-const subjectsMemory: SubjectRecord[] = [];
-
 export async function fetchSubjectsFromSupabase(classLevelId?: string): Promise<SubjectRecord[]> {
   try {
     let url = `${SUPABASE_URL}/rest/v1/subjects?select=*,class_level:class_levels(id,name,numeric_level)&order=name.asc`;
@@ -502,17 +497,11 @@ export async function fetchSubjectsFromSupabase(classLevelId?: string): Promise<
       headers: getHeaders(),
       cache: 'no-store',
     });
-    if (!res.ok) {
-      // Return memory fallback filtered by classLevelId if specified
-      if (classLevelId) {
-        return subjectsMemory.filter((s) => s.classLevelId === classLevelId);
-      }
-      return subjectsMemory;
-    }
-    const rows = await res.json();
-    if (!Array.isArray(rows)) return subjectsMemory;
+    if (!res.ok) return [];
+    const restRows = await res.json();
+    if (!Array.isArray(restRows)) return [];
 
-    return rows.map((s) => ({
+    return restRows.map((s) => ({
       id: s.id,
       classLevelId: s.class_level_id || (s.class_level ? s.class_level.id : ''),
       classLevelName: s.class_level ? s.class_level.name : (s.target_level || 'General'),
@@ -526,7 +515,7 @@ export async function fetchSubjectsFromSupabase(classLevelId?: string): Promise<
     }));
   } catch (err) {
     console.error('Error in fetchSubjectsFromSupabase:', err);
-    return subjectsMemory;
+    return [];
   }
 }
 
@@ -563,39 +552,36 @@ export async function createSubjectInSupabase(data: {
 
     if (res.ok) {
       const rows = await res.json();
-      const s = Array.isArray(rows) ? rows[0] : rows;
+      const r = Array.isArray(rows) ? rows[0] : rows;
       return {
-        id: s.id,
-        classLevelId: s.class_level_id,
-        classLevelName: '',
-        name: s.name,
-        code: s.code,
-        department: s.department,
-        targetLevel: s.target_level,
-        totalWeeklyClasses: s.total_weekly_classes,
-        isActive: s.is_active,
-        syllabus: s.syllabus || [],
+        id: r.id,
+        classLevelId: r.class_level_id || '',
+        classLevelName: data.targetLevel || 'General',
+        name: r.name,
+        code: r.code,
+        department: r.department || 'GENERAL',
+        targetLevel: r.target_level || '',
+        totalWeeklyClasses: r.total_weekly_classes || 3,
+        isActive: r.is_active ?? true,
+        syllabus: [],
       };
     }
-  } catch {
-    // Fallback to memory
+  } catch (e) {
+    console.error('Error creating subject in Supabase:', e);
   }
 
-  // Graceful memory fallback
-  const fallbackRecord: SubjectRecord = {
-    id: `sub-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+  return {
+    id: `subj-${Date.now()}`,
     classLevelId: data.classLevelId || '',
     classLevelName: data.targetLevel || 'General',
-    name: data.name.trim(),
-    code: data.code.trim().toUpperCase(),
+    name: data.name,
+    code: data.code,
     department: data.department || 'GENERAL',
     targetLevel: data.targetLevel || '',
     totalWeeklyClasses: data.totalWeeklyClasses || 3,
     isActive: data.isActive ?? true,
     syllabus: [],
   };
-  subjectsMemory.push(fallbackRecord);
-  return fallbackRecord;
 }
 
 export async function updateSubjectInSupabase(id: string, data: Partial<SubjectRecord>): Promise<boolean> {
@@ -616,18 +602,10 @@ export async function updateSubjectInSupabase(id: string, data: Partial<SubjectR
       body: JSON.stringify(payload),
     });
 
-    if (res.ok) return true;
+    return res.ok;
   } catch {
-    // Fallback
+    return false;
   }
-
-  // Fallback in memory
-  const idx = subjectsMemory.findIndex((s) => s.id === id);
-  if (idx !== -1) {
-    subjectsMemory[idx] = { ...subjectsMemory[idx], ...data };
-    return true;
-  }
-  return false;
 }
 
 export async function deleteSubjectInSupabase(id: string): Promise<boolean> {
@@ -636,17 +614,10 @@ export async function deleteSubjectInSupabase(id: string): Promise<boolean> {
       method: 'DELETE',
       headers: getHeaders(),
     });
-    if (res.ok) return true;
+    return res.ok;
   } catch {
-    // Fallback
+    return false;
   }
-
-  const idx = subjectsMemory.findIndex((s) => s.id === id);
-  if (idx !== -1) {
-    subjectsMemory.splice(idx, 1);
-    return true;
-  }
-  return true;
 }
 
 // Chapter and Topic mutations
@@ -675,11 +646,9 @@ export async function getSubjectById(id: string): Promise<SubjectRecord | null> 
       }
     }
   } catch {
-    // Fallback
+    return null;
   }
-
-  const found = subjectsMemory.find((s) => s.id === id);
-  return found || null;
+  return null;
 }
 
 export async function addChapterToSubject(
@@ -841,10 +810,10 @@ export async function fetchRoomsFromSupabase(): Promise<CampusRoom[]> {
       cache: 'no-store',
     });
     if (!res.ok) return [];
-    const rows = await res.json();
-    if (!Array.isArray(rows)) return [];
+    const restRows = await res.json();
+    if (!Array.isArray(restRows)) return [];
 
-    return rows.map((r) => ({
+    return restRows.map((r) => ({
       id: r.id,
       roomNumber: r.room_number,
       name: r.name,

@@ -7,6 +7,7 @@ import {
   updateUserPasswordInSupabase,
   deleteUserInSupabase,
 } from '@/lib/db/supabaseUsers';
+import { sendUserCredentialsWelcomeEmail } from '@/lib/email/mailer';
 
 export async function GET() {
   try {
@@ -47,12 +48,24 @@ export async function POST(request: Request) {
       );
     }
 
-    const createdAdmin = await createAdminInSupabase({
+    const { user: createdAdmin, initialPassword } = await createAdminInSupabase({
       fullName,
       email,
       phone,
       password,
     });
+
+    // Send Welcome Email with credentials & password change instructions
+    try {
+      await sendUserCredentialsWelcomeEmail({
+        to: createdAdmin.email,
+        fullName: createdAdmin.fullName,
+        role: createdAdmin.role || 'ADMIN',
+        initialPassword: initialPassword,
+      });
+    } catch (mailErr) {
+      console.warn('Welcome email dispatch notice for admin:', mailErr);
+    }
 
     return NextResponse.json(
       {

@@ -72,7 +72,7 @@ export async function createAdminInSupabase(data: {
   email: string;
   phone?: string;
   password?: string;
-}): Promise<SystemUser> {
+}): Promise<{ user: SystemUser; initialPassword: string }> {
   const initialPassword = data.password || generateRandomPassword(10);
   const passwordHash = await hashPassword(initialPassword);
   const now = new Date().toISOString();
@@ -107,7 +107,7 @@ export async function createAdminInSupabase(data: {
 
   const rows = await res.json();
   const created = Array.isArray(rows) ? rows[0] : rows;
-  return mapUserRow(created);
+  return { user: mapUserRow(created), initialPassword };
 }
 
 export async function updateUserStatusInSupabase(

@@ -16,6 +16,7 @@ import EmailRoundedIcon from '@mui/icons-material/EmailRounded';
 import AccessTimeRoundedIcon from '@mui/icons-material/AccessTimeRounded';
 import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
 import SchoolRoundedIcon from '@mui/icons-material/SchoolRounded';
+import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded';
 import { ispColors } from '@/theme/colors';
 
 export default function PublicFooter() {
@@ -297,7 +298,7 @@ export default function PublicFooter() {
 
         <Divider sx={{ my: 5, borderColor: 'rgba(255, 255, 255, 0.1)' }} />
 
-        {/* Bottom Bar */}
+        {/* Bottom Bar / Credit Row */}
         <Box
           sx={{
             display: 'flex',
@@ -307,25 +308,39 @@ export default function PublicFooter() {
             gap: 2,
           }}
         >
-          <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '13px' }}>
-            &copy; {currentYear} Indicator Student&apos;s Point (ISP). All rights reserved. &bull; Built for Student Success.
+          {/* Left Text */}
+          <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '13.5px', fontWeight: 500 }}>
+            All Rights Reserved by ISP
           </Typography>
 
-          <Stack direction="row" spacing={3}>
-            <Typography
-              component={Link}
-              href="/console/login"
-              variant="caption"
-              sx={{ color: '#94A3B8', textDecoration: 'none', fontSize: '13px', '&:hover': { color: '#FFFFFF' } }}
-            >
-              Staff Console
+          {/* Right Credit */}
+          <Stack direction="row" spacing={0.6} sx={{ alignItems: 'center' }}>
+            <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '13.5px', fontWeight: 500 }}>
+              Built with
+            </Typography>
+            <FavoriteRoundedIcon sx={{ color: '#EF4444', fontSize: '15px', mx: 0.2 }} />
+            <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '13.5px', fontWeight: 500 }}>
+              by
             </Typography>
             <Typography
-              component="span"
+              component="a"
+              href="https://web.sadi.com.bd"
+              target="_blank"
+              rel="noopener noreferrer"
               variant="caption"
-              sx={{ color: '#64748B', fontSize: '13px' }}
+              sx={{
+                color: '#FFD21F',
+                fontWeight: 700,
+                fontSize: '13.5px',
+                textDecoration: 'none',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  color: '#FFFFFF',
+                  textDecoration: 'none',
+                },
+              }}
             >
-              বহদ্দারহাট, চট্টগ্রাম
+              Sadi Jubair
             </Typography>
           </Stack>
         </Box>
