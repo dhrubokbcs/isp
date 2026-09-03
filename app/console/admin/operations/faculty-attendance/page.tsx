@@ -316,16 +316,7 @@ export default function FacultyAndStaffAttendancePage() {
   const handleOpenQrModal = async () => {
     setGeneratingQr(true);
     try {
-      const isLocal = typeof window !== 'undefined' && window.location.hostname.includes('localhost');
-      let defaultUrl = 'https://ispctg.live/kiosk/punch';
-      if (typeof window !== 'undefined') {
-        if (isLocal) {
-          defaultUrl = 'http://localhost:3000/kiosk/punch';
-        } else {
-          const publicHost = window.location.host.replace(/^console\./, '');
-          defaultUrl = `${window.location.protocol}//${publicHost}/kiosk/punch`;
-        }
-      }
+      const defaultUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ispctg.live/kiosk/punch';
       setQrTargetUrl(defaultUrl);
 
       const url = await QRCode.toDataURL(defaultUrl, {
