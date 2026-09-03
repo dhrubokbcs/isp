@@ -60,6 +60,10 @@ export async function proxy(req: NextRequest) {
     else if (url.pathname.startsWith('/teacher')) {
       internalPath = `/console${url.pathname}`;
     }
+    // /kiosk/* -> keep as /kiosk/* without /console prefix
+    else if (url.pathname.startsWith('/kiosk')) {
+      internalPath = url.pathname;
+    }
     // Any other subpath without /console prefix
     else if (!url.pathname.startsWith('/console')) {
       internalPath = `/console${url.pathname}`;
