@@ -81,7 +81,7 @@ export default function FacultyAndStaffAttendancePage() {
 
   // Frontdesk QR Poster State
   const [qrModalOpen, setQrModalOpen] = React.useState(false);
-  const [qrTargetUrl, setQrTargetUrl] = React.useState('https://console.ispctg.live/kiosk/punch');
+  const [qrTargetUrl, setQrTargetUrl] = React.useState('https://ispctg.live/kiosk/punch');
   const [qrDataUrl, setQrDataUrl] = React.useState('');
   const [generatingQr, setGeneratingQr] = React.useState(false);
 
@@ -317,7 +317,15 @@ export default function FacultyAndStaffAttendancePage() {
     setGeneratingQr(true);
     try {
       const isLocal = typeof window !== 'undefined' && window.location.hostname.includes('localhost');
-      const defaultUrl = isLocal ? 'https://console.ispctg.live/kiosk/punch' : `${window.location.origin}/kiosk/punch`;
+      let defaultUrl = 'https://ispctg.live/kiosk/punch';
+      if (typeof window !== 'undefined') {
+        if (isLocal) {
+          defaultUrl = 'http://localhost:3000/kiosk/punch';
+        } else {
+          const publicHost = window.location.host.replace(/^console\./, '');
+          defaultUrl = `${window.location.protocol}//${publicHost}/kiosk/punch`;
+        }
+      }
       setQrTargetUrl(defaultUrl);
 
       const url = await QRCode.toDataURL(defaultUrl, {
@@ -359,7 +367,7 @@ export default function FacultyAndStaffAttendancePage() {
 
   // Print Frontdesk QR Poster
   const handlePrintQrPoster = () => {
-    const punchUrl = qrTargetUrl.trim() || 'https://console.ispctg.live/kiosk/punch';
+    const punchUrl = qrTargetUrl.trim() || 'https://ispctg.live/kiosk/punch';
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       toastError('Please allow popups in your browser to print the QR poster.');
@@ -1408,7 +1416,7 @@ export default function FacultyAndStaffAttendancePage() {
                 label="Target URL encoded into QR Code"
                 value={qrTargetUrl}
                 onChange={(e) => handleUpdateQrUrl(e.target.value)}
-                helperText="In production, use your live domain URL so mobile phones can connect."
+                helperText="Public domain URL encoded into the QR code (e.g. https://ispctg.live/kiosk/punch)."
                 slotProps={{
                   input: {
                     sx: { fontFamily: 'monospace', fontSize: '13px', fontWeight: 600 },
@@ -1422,7 +1430,7 @@ export default function FacultyAndStaffAttendancePage() {
                 💡 How to use this at Reception:
               </Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary', lineHeight: 1.6, display: 'block' }}>
-                1. Ensure the URL points to your public live domain (e.g. <code>https://console.ispctg.live/kiosk/punch</code>).<br />
+                1. Ensure the URL points to your public live domain (e.g. <code>https://ispctg.live/kiosk/punch</code>).<br />
                 2. Click <strong>Print Sheet (A4)</strong> below to print the official reception poster.<br />
                 3. Teachers can scan it directly with their mobile phone cameras to punch in/out within 2 seconds.
               </Typography>
